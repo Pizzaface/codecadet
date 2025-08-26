@@ -234,7 +234,7 @@ class TerminalPane(QWidget):
         # Properly escape the PATH to handle spaces and special characters
         current_path = os.environ.get("PATH", "")
         # Add common Poetry/pyenv paths that might not be in the parent's PATH
-        additional_paths = "$HOME/.local/bin:$HOME/.poetry/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims"
+        additional_paths = "$HOME/.local/bin:$HOME/.poetry/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:$HOME/.nvm/versions/node/v20.17.0/bin"
         bash_command = (
             f'source ~/.bashrc 2>/dev/null; '  # Source user's bashrc for any additional setup
             f'export PATH={shlex.quote(current_path)}:{additional_paths}; '  # Import global PATH plus common tool paths
