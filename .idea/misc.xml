@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="uv (multi-claude-coding)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="uv (multi-claude-coding)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (claude-cadet)" project-jdk-type="Python SDK" />
 </project>

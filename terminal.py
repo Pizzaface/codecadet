@@ -5,7 +5,8 @@ import sys
 import shlex
 import subprocess
 from pathlib import Path
-from tkinter import messagebox
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
 from git_utils import which
 
@@ -67,8 +68,8 @@ def launch_claude_in_terminal(cwd: Path, claude_cmd: str = "claude"):
         if which(term):
             subprocess.Popen([term] + args, cwd=str(cwd))
             return
-    messagebox.showerror("Terminal not found",
-                         "No supported terminal found. Please open a terminal in the worktree directory and run `claude`.")
+    # If no terminal found, show error
+    QMessageBox.critical(None, "Error", "No supported terminal emulator found.")
 
 
 def launch_terminal_only(cwd: Path):
@@ -107,5 +108,6 @@ def launch_terminal_only(cwd: Path):
         if which(term):
             subprocess.Popen([term] + args, cwd=str(cwd))
             return
-    messagebox.showerror("Terminal not found",
-                         "No supported terminal found. Please open a terminal in the worktree directory manually.")
+    # If no terminal found, show error
+    QMessageBox.critical(None, "Error", "No supported terminal emulator found.")
+
