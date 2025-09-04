@@ -135,11 +135,20 @@ class TerminalPane(QWidget):
 
     @property
     def can_embed(self) -> bool:
-        return (sys.platform.startswith("linux") and which("xterm") is not None)
+        # Linux: Use xterm embedding
+        if sys.platform.startswith("linux"):
+            return which("xterm") is not None
+        # macOS: Use Terminal.app or iTerm2 with AppleScript (no X11 required)
+        elif sys.platform == "darwin":
+            return True  # Terminal.app is always available on macOS
+        return False
 
     def _update_embed_status(self):
         if self.can_embed:
-            self.status_lbl.setText("Multi-session mode (xterm)")
+            if sys.platform == "darwin":
+                self.status_lbl.setText("Multi-session mode (PTY)")
+            else:
+                self.status_lbl.setText("Multi-session mode (xterm)")
         else:
             self.status_lbl.setText("Embedding not available; using external terminal")
 
@@ -230,19 +239,93 @@ class TerminalPane(QWidget):
         claude_cmd = self.get_claude_cmd()
 
         # Command that starts in the worktree directory with Poetry available
-        # We explicitly preserve PATH and source bashrc for user tools
+        # We explicitly preserve PATH and source appropriate profile for user tools
         # Properly escape the PATH to handle spaces and special characters
         current_path = os.environ.get("PATH", "")
         # Add common Poetry/pyenv paths that might not be in the parent's PATH
         additional_paths = "$HOME/.local/bin:$HOME/.poetry/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:$HOME/.nvm/versions/node/v20.17.0/bin"
+        
+        # Choose appropriate shell and profile based on platform
+        if sys.platform == "darwin":
+            shell_cmd = "zsh"
+            profile_source = "source ~/.zshrc 2>/dev/null || source ~/.zprofile 2>/dev/null || true"
+        else:
+            shell_cmd = "bash"
+            profile_source = "source ~/.bashrc 2>/dev/null || true"
+        
         bash_command = (
-            f'source ~/.bashrc 2>/dev/null; '  # Source user's bashrc for any additional setup
+            f'{profile_source}; '  # Source user's profile for any additional setup
             f'export PATH={shlex.quote(current_path)}:{additional_paths}; '  # Import global PATH plus common tool paths
             f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
             f'cd {shlex.quote(str(cwd))}; '
-            f'exec bash -i'  # Interactive shell to maintain environment
+            f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
         )
 
+        # Platform-specific terminal implementation
+        if sys.platform == "darwin":
+            # Mac: Use PTY-based terminal emulator
+            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
+        else:
+            # Linux: Use xterm embedding
+            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid)
+
+    def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
+        """Start a PTY-based terminal for Mac."""
+        try:
+            from .pty_terminal import PTYTerminalWidget
+            
+            # Create PTY terminal widget
+            terminal_widget = PTYTerminalWidget(container, bash_command, str(cwd))
+            
+            # Add to container layout
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(terminal_widget)
+            
+            # Create a mock process object for compatibility with session manager
+            class MockProcess:
+                def __init__(self, widget):
+                    self.widget = widget
+                    
+                def poll(self):
+                    # Check if process is still running
+                    if hasattr(self.widget, 'process_pid'):
+                        try:
+                            os.kill(self.widget.process_pid, 0)
+                            return None  # Still running
+                        except OSError:
+                            return 0  # Process ended
+                    return 0
+                    
+                def terminate(self):
+                    if hasattr(self.widget, '_cleanup'):
+                        self.widget._cleanup()
+            
+            # Register this session with mock process
+            self.session_manager.register_session(
+                worktree_path=cwd,
+                process=MockProcess(terminal_widget),
+                container_frame=container,
+                command=claude_cmd
+            )
+            
+            self.status_lbl.setText(f"Started new session: {cwd.name}")
+            
+        except ImportError as e:
+            # Fallback to external terminal if PTY widget unavailable
+            QMessageBox.information(self, "Terminal", f"Embedded terminal not available: {e}. Opening external terminal.")
+            self.open_external()
+            container.setParent(None)
+            container.deleteLater()
+            self._show_no_session()
+        except Exception as e:
+            QMessageBox.critical(self, "Failed to start embedded terminal", str(e))
+            container.setParent(None)
+            container.deleteLater()
+            self._show_no_session()
+
+    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid):
+        """Start xterm-based terminal for Linux."""
         cmdline = [
             "xterm",
             "-into", str(wid),
