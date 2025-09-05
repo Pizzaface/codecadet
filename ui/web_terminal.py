@@ -35,6 +35,8 @@ class TerminalBridge(QObject):
         self.last_output_time = None
         self.last_input_time = None
         self._activity_seen = False  # Gate inactivity until first activity
+        self.tracking_enabled = False  # Do not track until armed by submit (Enter)
+        self._awaiting_output = False  # After submit, wait for first output before timing
         self.inactivity_timer = QTimer()
         self.inactivity_timer.timeout.connect(self._check_inactivity)
         self.inactivity_timer.start(1000)  # Check every second
@@ -96,7 +98,10 @@ class TerminalBridge(QObject):
                         # Update last output time and reset inactivity flag
                         self.last_output_time = time.time()
                         self._activity_seen = True
-                        self.inactivity_triggered = False
+                        if self.tracking_enabled:
+                            # First output after submit: start timing window
+                            self._awaiting_output = False
+                            self.inactivity_triggered = False
                         # Indicate activity (output)
                         self.activity.emit()
                         # Emit base64 to preserve bytes and escape sequences
@@ -108,23 +113,32 @@ class TerminalBridge(QObject):
                 break
     
     def _check_inactivity(self):
-        """Check if there's been no input or output for the timeout."""
+        """Check if there's been no output for the timeout after a submit."""
+        if not self.tracking_enabled:
+            return
+        # Don't consider inactivity until after we see first output post-submit
+        if self._awaiting_output:
+            return
         if not self.inactivity_triggered and self._activity_seen:
-            # Determine most recent activity: either PTY output or user input
-            last_activity_candidates = [t for t in (self.last_output_time, self.last_input_time) if t]
-            if last_activity_candidates:
-                last_activity = max(last_activity_candidates)
-                if (time.time() - last_activity) >= INACTIVITY_TIMER:
+            # Only consider last output time to avoid false positives from input
+            if self.last_output_time:
+                if (time.time() - self.last_output_time) >= INACTIVITY_TIMER:
                     self.inactivity_triggered = True
                     self.inactivity_detected.emit()
     
     @Slot(str)
     def write_to_pty(self, data):
         """Write data to PTY."""
-        # Treat user typing as activity; clear inactivity state
+        # Mark input activity for UI, but don't reset inactivity timer on input
         self.last_input_time = time.time()
         self._activity_seen = True
-        self.inactivity_triggered = False
+        # If user submitted (pressed Enter), arm tracking for this request
+        if '\r' in data:
+            self.tracking_enabled = True
+            self._awaiting_output = True
+            self.inactivity_triggered = False
+            # Clear last_output_time so we only start timing after first output
+            self.last_output_time = None
         # Indicate activity (input)
         self.activity.emit()
 
@@ -133,6 +147,17 @@ class TerminalBridge(QObject):
                 os.write(self.master_fd, data.encode('utf-8'))
             except OSError:
                 pass
+
+    def enable_tracking(self):
+        """Arm inactivity tracking from now on."""
+        # Keep available for manual arming, but prefer Enter-based arming.
+        self.tracking_enabled = True
+        now = time.time()
+        self.last_input_time = now
+        # Defer timing until first output to avoid false positives
+        self.last_output_time = None
+        self._awaiting_output = True
+        self.inactivity_triggered = False
     
     @Slot(int, int)
     def resize_pty(self, cols, rows):
@@ -240,7 +265,8 @@ class WebTerminalWidget(QWidget):
         escaped_b64 = json.dumps(data)
         js_code = f"window.writeToTerminalBase64({escaped_b64})"
         self.web_view.page().runJavaScript(js_code)
-    
+        # No auto-arming here; arming occurs on Enter in write_to_pty
+        
     def _load_notification_sound(self):
         """Load the notification sound file."""
         # Look for sound file in assets directory
@@ -253,22 +279,13 @@ class WebTerminalWidget(QWidget):
     
     def _on_inactivity_detected(self):
         """Handle inactivity detection - play a sound."""
-        # Only play sound if this terminal is visible and window is active
-        # Also rate-limit to avoid rapid repeats
-        try:
-            now = time.time()
-            window_active = self.window().isActiveWindow() if self.window() else True
-            if self.isVisible() and window_active and self.sound_effect.source():
-                if (now - self._last_sound_time) >= 10.0:  # 10s minimum between sounds
-                    self.sound_effect.play()
-                    self._last_sound_time = now
-        except Exception:
-            pass
         # Notify listeners (e.g., main window/sidebar) with the worktree path
+        # Sound is now handled centrally in the main window alongside the visual indicator.
         self.inactivity_for_worktree.emit(self.cwd_path)
 
     def _on_activity(self):
         """Bridge reported activity (input/output) — bubble up with path."""
+        # Do not auto-arm tracking here; rely on Enter-based arming
         self.activity_for_worktree.emit(self.cwd_path)
     
     def closeEvent(self, event):

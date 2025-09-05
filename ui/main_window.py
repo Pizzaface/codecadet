@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QUrl
 from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QStatusBar, QMenuBar, QMenu, QMessageBox, QFileDialog,
     QInputDialog, QApplication, QDialog
 )
+from PySide6.QtMultimedia import QSoundEffect
 
 from config import load_config, save_config, push_recent_repo, get_agent_command, get_default_agent, get_coding_agents
 from git_utils import git_version_ok, ensure_repo_root, list_worktrees, list_branches
@@ -56,6 +57,14 @@ class App(QMainWindow):
         self._setup_menus()
         self._setup_shortcuts()
         self._populate_agent_combo()
+        
+        # Notification sound (shared across app)
+        self._notif_sound = QSoundEffect()
+        self._last_sound_time = 0.0
+        sound_path = Path(__file__).parent.parent / "assets" / "done.wav"
+        if sound_path.exists():
+            self._notif_sound.setSource(QUrl.fromLocalFile(str(sound_path)))
+            self._notif_sound.setVolume(0.5)
         
         # Initial Git check
         if not git_version_ok():
@@ -209,6 +218,19 @@ class App(QMainWindow):
         
         # Status tooltip for additional information
         self.status_tooltip = StatusTooltip(status_label)
+        
+        
+    def _play_notification_sound(self):
+        try:
+            if self._notif_sound and self._notif_sound.source():
+                import time
+                now = time.time()
+                # Rate-limit to avoid rapid repeats
+                if (now - self._last_sound_time) >= 4.0:
+                    self._notif_sound.play()
+                    self._last_sound_time = now
+        except Exception:
+            pass
 
     def notify_inactivity(self, path: Path):
         """Called when a background terminal session becomes inactive.
@@ -218,6 +240,7 @@ class App(QMainWindow):
             selected = self.sidebar.get_selected_worktree()
             if not selected or selected != path:
                 self.sidebar.set_attention_for_path(path, True)
+                self._play_notification_sound()
         except Exception:
             pass
 
