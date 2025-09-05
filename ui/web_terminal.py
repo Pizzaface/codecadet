@@ -188,6 +188,7 @@ class WebTerminalWidget(QWidget):
         
         # Setup sound effect for inactivity notification
         self.sound_effect = QSoundEffect()
+        self._last_sound_time = 0.0
         self._load_notification_sound()
         
         self._setup_ui()
@@ -252,9 +253,17 @@ class WebTerminalWidget(QWidget):
     
     def _on_inactivity_detected(self):
         """Handle inactivity detection - play a sound."""
-        # Play the sound effect from PySide6
-        if self.sound_effect.source():
-            self.sound_effect.play()
+        # Only play sound if this terminal is visible and window is active
+        # Also rate-limit to avoid rapid repeats
+        try:
+            now = time.time()
+            window_active = self.window().isActiveWindow() if self.window() else True
+            if self.isVisible() and window_active and self.sound_effect.source():
+                if (now - self._last_sound_time) >= 10.0:  # 10s minimum between sounds
+                    self.sound_effect.play()
+                    self._last_sound_time = now
+        except Exception:
+            pass
         # Notify listeners (e.g., main window/sidebar) with the worktree path
         self.inactivity_for_worktree.emit(self.cwd_path)
 
