@@ -220,6 +220,13 @@ class App(QMainWindow):
                 self.sidebar.set_attention_for_path(path, True)
         except Exception:
             pass
+
+    def notify_activity(self, path: Path):
+        """Called when a session shows activity; clears the sidebar indicator."""
+        try:
+            self.sidebar.set_attention_for_path(path, False)
+        except Exception:
+            pass
     
     def _setup_menus(self):
         """Setup the menu bar."""

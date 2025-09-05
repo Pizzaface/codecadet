@@ -133,7 +133,7 @@ class SimpleWorktreePanel(QFrame):
                     border: none !important;
                 }
             """)
-            # Clear attention when selected
+            # Clear attention indicator when switching to this worktree
             self.set_attention(False)
         else:
             self._apply_dark_theme()
@@ -637,8 +637,6 @@ class SimpleWorktreeSidebar(QWidget):
             if panel.info == info:
                 self.selected_panel = panel
                 panel.set_selected(True)
-                # Clear any attention indicator when user navigates to it
-                panel.set_attention(False)
                 break
 
         # Notify main window

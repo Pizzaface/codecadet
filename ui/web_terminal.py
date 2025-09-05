@@ -24,6 +24,7 @@ class TerminalBridge(QObject):
     
     data_received = Signal(str)
     inactivity_detected = Signal()  # Signal when no output for 10 seconds
+    activity = Signal()  # Fires on any input or output
     
     def __init__(self):
         super().__init__()
@@ -96,6 +97,8 @@ class TerminalBridge(QObject):
                         self.last_output_time = time.time()
                         self._activity_seen = True
                         self.inactivity_triggered = False
+                        # Indicate activity (output)
+                        self.activity.emit()
                         # Emit base64 to preserve bytes and escape sequences
                         b64 = base64.b64encode(data).decode('ascii')
                         self.data_received.emit(b64)
@@ -122,6 +125,8 @@ class TerminalBridge(QObject):
         self.last_input_time = time.time()
         self._activity_seen = True
         self.inactivity_triggered = False
+        # Indicate activity (input)
+        self.activity.emit()
 
         if self.master_fd and data:
             try:
@@ -168,6 +173,7 @@ class TerminalBridge(QObject):
 class WebTerminalWidget(QWidget):
     """Web-based terminal widget using xterm.js."""
     inactivity_for_worktree = Signal(str)  # Emits worktree path on inactivity
+    activity_for_worktree = Signal(str)    # Emits worktree path on activity
     
     def __init__(self, parent, command, cwd):
         super().__init__(parent)
@@ -178,6 +184,7 @@ class WebTerminalWidget(QWidget):
         self.bridge = TerminalBridge()
         self.bridge.data_received.connect(self._on_data_received)
         self.bridge.inactivity_detected.connect(self._on_inactivity_detected)
+        self.bridge.activity.connect(self._on_activity)
         
         # Setup sound effect for inactivity notification
         self.sound_effect = QSoundEffect()
@@ -250,6 +257,10 @@ class WebTerminalWidget(QWidget):
             self.sound_effect.play()
         # Notify listeners (e.g., main window/sidebar) with the worktree path
         self.inactivity_for_worktree.emit(self.cwd_path)
+
+    def _on_activity(self):
+        """Bridge reported activity (input/output) — bubble up with path."""
+        self.activity_for_worktree.emit(self.cwd_path)
     
     def closeEvent(self, event):
         """Clean up when closing."""

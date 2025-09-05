@@ -302,6 +302,7 @@ class TerminalPane(QWidget):
                 # Hook inactivity signal to bubble up to the main app/sidebar
                 try:
                     terminal_widget.inactivity_for_worktree.connect(self._on_session_inactivity)
+                    terminal_widget.activity_for_worktree.connect(self._on_session_activity)
                 except Exception:
                     pass
                 
@@ -466,6 +467,16 @@ class TerminalPane(QWidget):
                 app = self._get_main_app()
                 if app and hasattr(app, 'notify_inactivity'):
                     app.notify_inactivity(session_path)
+        except Exception:
+            pass
+
+    def _on_session_activity(self, path_str: str):
+        """Clear sidebar attention when session shows activity again."""
+        try:
+            from pathlib import Path
+            app = self._get_main_app()
+            if app and hasattr(app, 'notify_activity'):
+                app.notify_activity(Path(path_str))
         except Exception:
             pass
 
