@@ -42,6 +42,11 @@ class TerminalBridge(QObject):
             pid, fd = pty.fork()
             
             if pid == 0:  # Child process
+                # Close parent's stdout/stderr to prevent interference
+                import sys
+                sys.stdout.flush()
+                sys.stderr.flush()
+                
                 # Set environment for proper terminal and character support
                 os.environ['TERM'] = 'xterm-256color'
                 os.environ['COLUMNS'] = '120'  # Wider default
@@ -73,7 +78,7 @@ class TerminalBridge(QObject):
                 return True
                 
         except Exception as e:
-            print(f"Failed to start PTY: {e}")
+            pass  # Failed to start PTY
             return False
     
     def _read_pty(self):
@@ -123,9 +128,8 @@ class TerminalBridge(QObject):
                 # Set the terminal size
                 s = struct.pack('HHHH', rows, cols, 0, 0)
                 fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
-                print(f"Resized PTY to {cols}x{rows}")
-            except OSError as e:
-                print(f"Failed to resize PTY: {e}")
+            except OSError:
+                pass
     
     def cleanup(self):
         """Clean up PTY resources."""
@@ -366,14 +370,13 @@ class WebTerminalWidget(QWidget):
             self.sound_effect.setSource(QUrl.fromLocalFile(str(sound_path)))
             self.sound_effect.setVolume(0.5)
         else:
-            print(f"Notification sound not found at {sound_path}")
+            pass  # Notification sound not found
     
     def _on_inactivity_detected(self):
         """Handle inactivity detection - play a sound."""
         # Play the sound effect from PySide6
         if self.sound_effect.source():
             self.sound_effect.play()
-        print(f"Terminal inactivity detected - {INACTIVITY_TIMER} seconds without output")
     
     def closeEvent(self, event):
         """Clean up when closing."""

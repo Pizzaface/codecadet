@@ -352,15 +352,25 @@ class PTYTerminalWidget(QTextEdit):
         text = re.sub(r'\x1b\[[0-9]*[GKJ]', '', text)  # Column/line operations
         text = re.sub(r'\x1b\[K', '', text)  # Clear to end of line
         
-        # Handle carriage returns
+        # Handle carriage returns more robustly
+        # Many CLIs use '\r' to redraw the same line (spinners/progress).
+        # Always treat bare '\r' as "return to start of line and overwrite",
+        # regardless of whether a '\n' also appears in the same chunk.
         if '\r\n' in text:
+            # Normalize CRLF to LF first
             text = text.replace('\r\n', '\n')
-        elif '\r' in text and '\n' not in text:
+        if '\r' in text:
+            # Clear the current line in the widget before applying updated content
             cursor = self.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
             cursor.movePosition(QTextCursor.MoveOperation.EndOfLine, QTextCursor.MoveMode.KeepAnchor)
             cursor.removeSelectedText()
-            text = text.replace('\r', '')
+            # For each logical line in this chunk, keep only the portion after the last CR
+            # This collapses multiple CR-updates in one chunk to the final frame, preventing
+            # stray carriage returns from creating visual newlines.
+            parts = text.split('\n')
+            parts = [p.split('\r')[-1] for p in parts]
+            text = '\n'.join(parts)
         
         # Process ANSI color sequences
         cursor = self.textCursor()
