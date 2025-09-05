@@ -22,10 +22,11 @@ class TerminalPane(QWidget):
     Shows/hides the appropriate session when switching worktrees.
     """
 
-    def __init__(self, parent, get_selected_cwd, claude_cmd_getter):
+    def __init__(self, parent, get_selected_cwd, claude_cmd_getter, config_getter=None):
         super().__init__(parent)
         self.get_selected_cwd = get_selected_cwd
         self.get_claude_cmd = claude_cmd_getter
+        self.get_config = config_getter
         self.current_worktree_path: Path | None = None
         self.current_container: QWidget | None = None
 
@@ -80,9 +81,10 @@ class TerminalPane(QWidget):
         # Control bar
         control_layout = QHBoxLayout()
         
-        run_claude_btn = QPushButton("▶ Run Claude here")
-        run_claude_btn.clicked.connect(self.run_claude_here)
-        control_layout.addWidget(run_claude_btn)
+        self.run_claude_btn = QPushButton("▶ Run Claude here")
+        self.run_claude_btn.clicked.connect(self.run_claude_here)
+        control_layout.addWidget(self.run_claude_btn)
+        self.update_run_button_text()
         
         external_btn = QPushButton("□ Open External Terminal")
         external_btn.clicked.connect(self.open_external)
@@ -132,15 +134,30 @@ class TerminalPane(QWidget):
     def set_session_manager(self, session_manager):
         """Set the session manager instance."""
         self.session_manager = session_manager
+    
+    def update_run_button_text(self):
+        """Update the run button text with the default agent name."""
+        if self.get_config:
+            from config import get_default_agent, get_agent_config
+            config = self.get_config()
+            default_agent = get_default_agent(config)
+            agent_config = get_agent_config(config, default_agent)
+            if agent_config:
+                agent_name = agent_config.get("name", default_agent)
+                self.run_claude_btn.setText(f"▶ Run {agent_name} here")
+            else:
+                self.run_claude_btn.setText("▶ Run Claude here")
+        else:
+            self.run_claude_btn.setText("▶ Run Claude here")
 
     @property
     def can_embed(self) -> bool:
         # Linux: Use xterm embedding
         if sys.platform.startswith("linux"):
             return which("xterm") is not None
-        # macOS: Use Terminal.app or iTerm2 with AppleScript (no X11 required)
+        # macOS: Check for iTerm2 first, then Terminal.app
         elif sys.platform == "darwin":
-            return True  # Terminal.app is always available on macOS
+            return True
         return False
 
     def _update_embed_status(self):
@@ -192,8 +209,8 @@ class TerminalPane(QWidget):
             # No session for this worktree
             self._show_no_session()
 
-    def run_claude_here(self):
-        """Start a new Claude session for the current worktree."""
+    def run_claude_here(self, agent_cmd=None):
+        """Start a new agent session for the current worktree."""
         cwd = self.get_selected_cwd()
         if not cwd:
             return
@@ -236,7 +253,7 @@ class TerminalPane(QWidget):
         rows = max(10, (container_height - 20) // char_height)
         geometry = f"{cols}x{rows}"
 
-        claude_cmd = self.get_claude_cmd()
+        claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
 
         # Command that starts in the worktree directory with Poetry available
         # We explicitly preserve PATH and source appropriate profile for user tools
@@ -256,6 +273,10 @@ class TerminalPane(QWidget):
         bash_command = (
             f'{profile_source}; '  # Source user's profile for any additional setup
             f'export PATH={shlex.quote(current_path)}:{additional_paths}; '  # Import global PATH plus common tool paths
+            f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
+            f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
+            f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
+            f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
             f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
             f'cd {shlex.quote(str(cwd))}; '
             f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
@@ -272,47 +293,91 @@ class TerminalPane(QWidget):
     def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
         """Start a PTY-based terminal for Mac."""
         try:
-            from .pty_terminal import PTYTerminalWidget
-            
-            # Create PTY terminal widget
-            terminal_widget = PTYTerminalWidget(container, bash_command, str(cwd))
-            
-            # Add to container layout
-            layout = QVBoxLayout(container)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(terminal_widget)
-            
-            # Create a mock process object for compatibility with session manager
-            class MockProcess:
-                def __init__(self, widget):
-                    self.widget = widget
-                    
-                def poll(self):
-                    # Check if process is still running
-                    if hasattr(self.widget, 'process_pid'):
-                        try:
-                            os.kill(self.widget.process_pid, 0)
-                            return None  # Still running
-                        except OSError:
-                            return 0  # Process ended
-                    return 0
-                    
-                def terminate(self):
-                    if hasattr(self.widget, '_cleanup'):
-                        self.widget._cleanup()
-            
-            # Register this session with mock process
-            self.session_manager.register_session(
-                worktree_path=cwd,
-                process=MockProcess(terminal_widget),
-                container_frame=container,
-                command=claude_cmd
-            )
-            
-            self.status_lbl.setText(f"Started new session: {cwd.name}")
+            # Try web terminal first (better character handling)
+            try:
+                from .web_terminal import WebTerminalWidget
+                
+                # Create web terminal widget
+                terminal_widget = WebTerminalWidget(container, bash_command, str(cwd))
+                
+                # Add to container layout
+                layout = QVBoxLayout(container)
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.addWidget(terminal_widget)
+                
+                # Create a mock process object for compatibility with session manager
+                class MockProcess:
+                    def __init__(self, widget):
+                        self.widget = widget
+                        
+                    def poll(self):
+                        # Check if process is still running via bridge
+                        if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
+                            try:
+                                os.kill(self.widget.bridge.process_pid, 0)
+                                return None  # Still running
+                            except OSError:
+                                return 0  # Process ended
+                        return 0
+                        
+                    def terminate(self):
+                        if hasattr(self.widget, 'cleanup'):
+                            self.widget.cleanup()
+                
+                # Register this session with mock process
+                self.session_manager.register_session(
+                    worktree_path=cwd,
+                    process=MockProcess(terminal_widget),
+                    container_frame=container,
+                    command=claude_cmd
+                )
+                
+                self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
+                return
+                
+            except ImportError:
+                # Fall back to original PTY terminal
+                from .pty_terminal import PTYTerminalWidget
+                
+                # Create PTY terminal widget
+                terminal_widget = PTYTerminalWidget(container, bash_command, str(cwd))
+                
+                # Add to container layout
+                layout = QVBoxLayout(container)
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.addWidget(terminal_widget)
+                
+                # Create a mock process object for compatibility with session manager
+                class MockProcess:
+                    def __init__(self, widget):
+                        self.widget = widget
+                        
+                    def poll(self):
+                        # Check if process is still running
+                        if hasattr(self.widget, 'process_pid'):
+                            try:
+                                os.kill(self.widget.process_pid, 0)
+                                return None  # Still running
+                            except OSError:
+                                return 0  # Process ended
+                        return 0
+                        
+                    def terminate(self):
+                        if hasattr(self.widget, '_cleanup'):
+                            self.widget._cleanup()
+                
+                # Register this session with mock process
+                self.session_manager.register_session(
+                    worktree_path=cwd,
+                    process=MockProcess(terminal_widget),
+                    container_frame=container,
+                    command=claude_cmd
+                )
+                
+                self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
             
         except ImportError as e:
-            # Fallback to external terminal if PTY widget unavailable
+            # Fallback to external terminal if no terminal widget available
             QMessageBox.information(self, "Terminal", f"Embedded terminal not available: {e}. Opening external terminal.")
             self.open_external()
             container.setParent(None)

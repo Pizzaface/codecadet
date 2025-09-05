@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QFont, QAction, QKeySequence
+from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QCheckBox, QSplitter,
@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QInputDialog, QApplication, QDialog
 )
 
-from config import load_config, save_config, push_recent_repo
+from config import load_config, save_config, push_recent_repo, get_agent_command, get_default_agent, get_coding_agents
 from git_utils import git_version_ok, ensure_repo_root, list_worktrees, list_branches
 from git_utils import add_worktree, remove_worktree, prune_worktrees
 from session import SessionManager
@@ -34,6 +34,11 @@ class App(QMainWindow):
         self.setWindowTitle("Git Worktree Manager for Claude Code")
         self.resize(1000, 600)
         self.setMinimumSize(880, 520)
+        
+        # Set window icon
+        icon_path = Path(__file__).parent.parent / "assets" / "icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         # Config
         self.cfg = load_config()
@@ -50,6 +55,7 @@ class App(QMainWindow):
         self._apply_theme(self.cfg.get("theme", "dark"))
         self._setup_menus()
         self._setup_shortcuts()
+        self._populate_agent_combo()
         
         # Initial Git check
         if not git_version_ok():
@@ -132,12 +138,16 @@ class App(QMainWindow):
         self.term = TerminalPane(
             splitter,
             get_selected_cwd=lambda: self.sidebar.get_selected_worktree(),
-            claude_cmd_getter=lambda: self.cfg.get("claude_command", "claude")
+            claude_cmd_getter=lambda: get_agent_command(self.cfg),
+            config_getter=lambda: self.cfg
         )
         splitter.addWidget(self.term)
         
         # Set the session manager for the terminal pane
         self.term.set_session_manager(self.session_manager)
+        
+        # Update terminal button text with default agent
+        self.term.update_run_button_text()
         
         # Set splitter proportions
         splitter.setSizes([400, 600])
@@ -169,10 +179,21 @@ class App(QMainWindow):
         bottom_layout.addWidget(editor_btn)
         add_tooltip_to_button(editor_btn, "Open the selected worktree in your default code editor")
         
-        claude_btn = QPushButton("Run Claude")
+        # Agent selector and Run button
+        agent_layout = QHBoxLayout()
+        
+        self.agent_combo = QComboBox()
+        self.agent_combo.setMinimumWidth(120)
+        self.agent_combo.currentIndexChanged.connect(self._on_agent_selection_changed)
+        agent_layout.addWidget(self.agent_combo)
+        add_tooltip(self.agent_combo, "Select the coding agent to run")
+        
+        claude_btn = QPushButton("Run")
         claude_btn.clicked.connect(self.launch_claude)
-        bottom_layout.addWidget(claude_btn)
-        add_tooltip_to_button(claude_btn, "Launch Claude CLI in the selected worktree")
+        agent_layout.addWidget(claude_btn)
+        add_tooltip_to_button(claude_btn, "Launch the selected coding agent in the selected worktree")
+        
+        bottom_layout.addLayout(agent_layout)
         
         bottom_layout.addStretch()
         main_layout.addLayout(bottom_layout)
@@ -234,17 +255,9 @@ class App(QMainWindow):
         # Preferences menu
         pref_menu = menubar.addMenu("Preferences")
         
-        self.embed_action = QAction("Embed terminal when possible (Linux + xterm)", self)
-        self.embed_action.setCheckable(True)
-        self.embed_action.setChecked(bool(self.cfg.get("embed_terminal", True)))
-        self.embed_action.triggered.connect(self._persist_embed)
-        pref_menu.addAction(self.embed_action)
-        
-        pref_menu.addSeparator()
-        
-        claude_cmd_action = QAction("Set Claude command…", self)
-        claude_cmd_action.triggered.connect(self._set_claude_cmd)
-        pref_menu.addAction(claude_cmd_action)
+        preferences_action = QAction("Preferences…", self)
+        preferences_action.triggered.connect(self._open_preferences)
+        pref_menu.addAction(preferences_action)
         
         # Help menu
         help_menu = menubar.addMenu("Help")
@@ -637,7 +650,7 @@ class App(QMainWindow):
         self._set_status(f"🗂️ Selected: {worktree_info.path.name} (branch: {branch_name})")
 
         # Switch terminal pane to show this worktree's session
-        if self.embed_action.isChecked() and self.term.can_embed:
+        if self.cfg.get("embed_terminal", True) and self.term.can_embed:
             self.term.switch_to_worktree(worktree_info.path)
 
     def get_repo(self) -> Path | None:
@@ -735,39 +748,40 @@ class App(QMainWindow):
         open_in_editor(wt)
 
     def launch_claude(self):
-        """Launch Claude in selected worktree."""
+        """Launch selected agent in selected worktree."""
         wt = self.selected_worktree()
         if not wt:
             return
+        
+        # Get selected agent
+        selected_agent = self.agent_combo.currentData()
+        if not selected_agent:
+            selected_agent = get_default_agent(self.cfg)
+        
+        # Get the command for the selected agent
+        agent_command = get_agent_command(self.cfg, selected_agent)
+        
         # If user prefers embedding and platform supports it, use the right pane
-        if self.embed_action.isChecked() and self.term.can_embed:
-            self.term.run_claude_here()
+        if self.cfg.get("embed_terminal", True) and self.term.can_embed:
+            self.term.run_claude_here(agent_command)
         else:
-            launch_claude_in_terminal(wt, claude_cmd=self.cfg.get("claude_command", "claude"))
+            launch_claude_in_terminal(wt, claude_cmd=agent_command)
 
     def _persist_auto_reopen(self, checked: bool):
         """Persist auto-reopen setting."""
         self.cfg["auto_reopen_last"] = checked
         save_config(self.cfg)
 
-    def _persist_embed(self, checked: bool):
-        """Persist embed terminal setting."""
-        self.cfg["embed_terminal"] = checked
-        save_config(self.cfg)
 
-    def _set_claude_cmd(self):
-        """Set Claude command."""
-        cur = self.cfg.get("claude_command", "claude")
-        text, ok = QInputDialog.getText(
-            self,
-            "Claude command",
-            "Command to run for Claude:",
-            text=cur
-        )
-        if ok and text:
-            self.cfg["claude_command"] = text.strip()
+    def _open_preferences(self):
+        """Open preferences dialog."""
+        from .dialogs import AgentConfigDialog
+        dialog = AgentConfigDialog(self, self.cfg)
+        if dialog.exec() == QDialog.Accepted:
             save_config(self.cfg)
-            self._set_status(f"⚙️ Claude command updated: {text.strip()}")
+            self._set_status("⚙️ Preferences updated")
+            self._populate_agent_combo()  # Refresh agent list
+            self.term.update_run_button_text()  # Update terminal button text
 
     def _clear_recents(self):
         """Clear recent repositories."""
@@ -775,6 +789,44 @@ class App(QMainWindow):
         save_config(self.cfg)
         self.repo_combo.clear()
         self._rebuild_recent_menu()
+    
+    def _populate_agent_combo(self):
+        """Populate the agent selector combo box."""
+        current_selection = self.agent_combo.currentData()
+        self.agent_combo.clear()
+        
+        agents = get_coding_agents(self.cfg)
+        default_agent = get_default_agent(self.cfg)
+        
+        # Add enabled agents
+        for agent_id, agent_config in agents.items():
+            if agent_config.get("enabled", True):
+                name = agent_config.get("name", agent_id)
+                self.agent_combo.addItem(name, agent_id)
+        
+        # Set default selection
+        if current_selection:
+            # Try to restore previous selection
+            for i in range(self.agent_combo.count()):
+                if self.agent_combo.itemData(i) == current_selection:
+                    self.agent_combo.setCurrentIndex(i)
+                    return
+        
+        # Fall back to default agent
+        for i in range(self.agent_combo.count()):
+            if self.agent_combo.itemData(i) == default_agent:
+                self.agent_combo.setCurrentIndex(i)
+                return
+    
+    def _on_agent_selection_changed(self, index):
+        """Handle agent selection change."""
+        if index >= 0:
+            agent_id = self.agent_combo.itemData(index)
+            agent_name = self.agent_combo.itemText(index)
+            self._set_status(f"🤖 Selected agent: {agent_name}")
+            # Update terminal button if this becomes the default
+            if agent_id == get_default_agent(self.cfg):
+                self.term.update_run_button_text()
 
     def _set_status(self, text: str):
         """Set status bar text."""
