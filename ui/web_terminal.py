@@ -5,6 +5,7 @@ import pty
 import select
 import json
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, QObject, Slot, Signal, QTimer
@@ -12,12 +13,16 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtMultimedia import QSoundEffect
+
+INACTIVITY_TIMER = 3
 
 
 class TerminalBridge(QObject):
     """Bridge between the web terminal and PTY."""
     
     data_received = Signal(str)
+    inactivity_detected = Signal()  # Signal when no output for 10 seconds
     
     def __init__(self):
         super().__init__()
@@ -25,6 +30,11 @@ class TerminalBridge(QObject):
         self.process_pid = None
         self.reader_thread = None
         self.running = False
+        self.last_output_time = None
+        self.inactivity_timer = QTimer()
+        self.inactivity_timer.timeout.connect(self._check_inactivity)
+        self.inactivity_timer.start(1000)  # Check every second
+        self.inactivity_triggered = False
         
     def start_pty(self, command, cwd):
         """Start PTY process."""
@@ -74,6 +84,9 @@ class TerminalBridge(QObject):
                 if r:
                     data = os.read(self.master_fd, 4096)
                     if data:
+                        # Update last output time and reset inactivity flag
+                        self.last_output_time = time.time()
+                        self.inactivity_triggered = False
                         # Decode and emit data
                         text = data.decode('utf-8', errors='replace')
                         self.data_received.emit(text)
@@ -81,6 +94,14 @@ class TerminalBridge(QObject):
                         break
             except OSError:
                 break
+    
+    def _check_inactivity(self):
+        """Check if there's been no output for 10 seconds."""
+        if self.last_output_time and not self.inactivity_triggered:
+            time_since_output = time.time() - self.last_output_time
+            if time_since_output >= INACTIVITY_TIMER:  # 10 seconds of inactivity
+                self.inactivity_triggered = True
+                self.inactivity_detected.emit()
     
     @Slot(str)
     def write_to_pty(self, data):
@@ -109,6 +130,7 @@ class TerminalBridge(QObject):
     def cleanup(self):
         """Clean up PTY resources."""
         self.running = False
+        self.inactivity_timer.stop()
         
         if self.reader_thread:
             self.reader_thread.join(timeout=1.0)
@@ -135,6 +157,11 @@ class WebTerminalWidget(QWidget):
         
         self.bridge = TerminalBridge()
         self.bridge.data_received.connect(self._on_data_received)
+        self.bridge.inactivity_detected.connect(self._on_inactivity_detected)
+        
+        # Setup sound effect for inactivity notification
+        self.sound_effect = QSoundEffect()
+        self._load_notification_sound()
         
         self._setup_ui()
         self._start_terminal(command, cwd)
@@ -330,6 +357,23 @@ class WebTerminalWidget(QWidget):
         escaped_data = json.dumps(data)
         js_code = f"window.writeToTerminal({escaped_data})"
         self.web_view.page().runJavaScript(js_code)
+    
+    def _load_notification_sound(self):
+        """Load the notification sound file."""
+        # Look for sound file in assets directory
+        sound_path = Path(__file__).parent.parent / "assets" / "done.wav"
+        if sound_path.exists():
+            self.sound_effect.setSource(QUrl.fromLocalFile(str(sound_path)))
+            self.sound_effect.setVolume(0.5)
+        else:
+            print(f"Notification sound not found at {sound_path}")
+    
+    def _on_inactivity_detected(self):
+        """Handle inactivity detection - play a sound."""
+        # Play the sound effect from PySide6
+        if self.sound_effect.source():
+            self.sound_effect.play()
+        print(f"Terminal inactivity detected - {INACTIVITY_TIMER} seconds without output")
     
     def closeEvent(self, event):
         """Clean up when closing."""
