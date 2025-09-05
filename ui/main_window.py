@@ -209,6 +209,17 @@ class App(QMainWindow):
         
         # Status tooltip for additional information
         self.status_tooltip = StatusTooltip(status_label)
+
+    def notify_inactivity(self, path: Path):
+        """Called when a background terminal session becomes inactive.
+        Shows a subtle indicator on the sidebar if the worktree is not selected.
+        """
+        try:
+            selected = self.sidebar.get_selected_worktree()
+            if not selected or selected != path:
+                self.sidebar.set_attention_for_path(path, True)
+        except Exception:
+            pass
     
     def _setup_menus(self):
         """Setup the menu bar."""

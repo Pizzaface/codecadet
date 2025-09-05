@@ -39,14 +39,27 @@ class SimpleWorktreePanel(QFrame):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(4)
         
-        # Name
+        # Name row with attention indicator
+        name_row = QHBoxLayout()
+        name_row.setContentsMargins(0, 0, 0, 0)
+
         name = self.info.path.name or str(self.info.path)
         if self.info.is_main:
             name += " (main)"
 
-        name_label = QLabel(name)
-        name_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        layout.addWidget(name_label)
+        self.name_label = QLabel(name)
+        self.name_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        name_row.addWidget(self.name_label)
+
+        name_row.addStretch()
+
+        # Attention dot (hidden by default)
+        self.attn_label = QLabel("●")
+        self.attn_label.setStyleSheet("color: #f4be6c; font-size: 14px;")
+        self.attn_label.setVisible(False)
+        name_row.addWidget(self.attn_label)
+
+        layout.addLayout(name_row)
 
         # Branch row with button
         branch_layout = QHBoxLayout()
@@ -120,6 +133,8 @@ class SimpleWorktreePanel(QFrame):
                     border: none !important;
                 }
             """)
+            # Clear attention when selected
+            self.set_attention(False)
         else:
             self._apply_dark_theme()
 
@@ -127,6 +142,11 @@ class SimpleWorktreePanel(QFrame):
         """Update the branch display after a branch switch."""
         branch_text = "detached" if not new_branch else new_branch.replace("refs/heads/", "")
         self.branch_label.setText(f"Branch: {branch_text}")
+
+    def set_attention(self, on: bool):
+        """Show or hide the attention dot."""
+        if hasattr(self, 'attn_label'):
+            self.attn_label.setVisible(bool(on))
 
 
 class SimpleWorktreeSidebar(QWidget):
@@ -240,6 +260,13 @@ class SimpleWorktreeSidebar(QWidget):
             # Insert before the stretch
             self.content_layout.insertWidget(self.content_layout.count() - 1, panel)
             self.panels.append(panel)
+
+    def set_attention_for_path(self, path: Path, on: bool):
+        """Set or clear the attention indicator for a given worktree path."""
+        for panel in self.panels:
+            if panel.info.path == path:
+                panel.set_attention(on)
+                break
     
     def _update_graphite_ui(self):
         """Update the Graphite commands UI section."""
@@ -610,6 +637,8 @@ class SimpleWorktreeSidebar(QWidget):
             if panel.info == info:
                 self.selected_panel = panel
                 panel.set_selected(True)
+                # Clear any attention indicator when user navigates to it
+                panel.set_attention(False)
                 break
 
         # Notify main window

@@ -299,6 +299,11 @@ class TerminalPane(QWidget):
                 
                 # Create web terminal widget
                 terminal_widget = WebTerminalWidget(container, bash_command, str(cwd))
+                # Hook inactivity signal to bubble up to the main app/sidebar
+                try:
+                    terminal_widget.inactivity_for_worktree.connect(self._on_session_inactivity)
+                except Exception:
+                    pass
                 
                 # Add to container layout
                 layout = QVBoxLayout(container)
@@ -442,6 +447,27 @@ class TerminalPane(QWidget):
             container.setParent(None)
             container.deleteLater()
             self._show_no_session()
+
+    def _get_main_app(self):
+        widget = self
+        while widget:
+            if hasattr(widget, 'notify_inactivity') and hasattr(widget, 'sidebar'):
+                return widget
+            widget = widget.parent()
+        return None
+
+    def _on_session_inactivity(self, path_str: str):
+        """Receive inactivity from a terminal session and notify the app/sidebar if not selected."""
+        try:
+            from pathlib import Path
+            selected = self.get_selected_cwd()
+            session_path = Path(path_str)
+            if not selected or selected != session_path:
+                app = self._get_main_app()
+                if app and hasattr(app, 'notify_inactivity'):
+                    app.notify_inactivity(session_path)
+        except Exception:
+            pass
 
     def open_external(self):
         """Open an external terminal."""

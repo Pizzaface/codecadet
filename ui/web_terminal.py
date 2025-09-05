@@ -6,6 +6,7 @@ import select
 import json
 import threading
 import time
+import base64
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, QObject, Slot, Signal, QTimer
@@ -31,6 +32,8 @@ class TerminalBridge(QObject):
         self.reader_thread = None
         self.running = False
         self.last_output_time = None
+        self.last_input_time = None
+        self._activity_seen = False  # Gate inactivity until first activity
         self.inactivity_timer = QTimer()
         self.inactivity_timer.timeout.connect(self._check_inactivity)
         self.inactivity_timer.start(1000)  # Check every second
@@ -91,26 +94,35 @@ class TerminalBridge(QObject):
                     if data:
                         # Update last output time and reset inactivity flag
                         self.last_output_time = time.time()
+                        self._activity_seen = True
                         self.inactivity_triggered = False
-                        # Decode and emit data
-                        text = data.decode('utf-8', errors='replace')
-                        self.data_received.emit(text)
+                        # Emit base64 to preserve bytes and escape sequences
+                        b64 = base64.b64encode(data).decode('ascii')
+                        self.data_received.emit(b64)
                     else:
                         break
             except OSError:
                 break
     
     def _check_inactivity(self):
-        """Check if there's been no output for 10 seconds."""
-        if self.last_output_time and not self.inactivity_triggered:
-            time_since_output = time.time() - self.last_output_time
-            if time_since_output >= INACTIVITY_TIMER:  # 10 seconds of inactivity
-                self.inactivity_triggered = True
-                self.inactivity_detected.emit()
+        """Check if there's been no input or output for the timeout."""
+        if not self.inactivity_triggered and self._activity_seen:
+            # Determine most recent activity: either PTY output or user input
+            last_activity_candidates = [t for t in (self.last_output_time, self.last_input_time) if t]
+            if last_activity_candidates:
+                last_activity = max(last_activity_candidates)
+                if (time.time() - last_activity) >= INACTIVITY_TIMER:
+                    self.inactivity_triggered = True
+                    self.inactivity_detected.emit()
     
     @Slot(str)
     def write_to_pty(self, data):
         """Write data to PTY."""
+        # Treat user typing as activity; clear inactivity state
+        self.last_input_time = time.time()
+        self._activity_seen = True
+        self.inactivity_triggered = False
+
         if self.master_fd and data:
             try:
                 os.write(self.master_fd, data.encode('utf-8'))
@@ -155,10 +167,14 @@ class TerminalBridge(QObject):
 
 class WebTerminalWidget(QWidget):
     """Web-based terminal widget using xterm.js."""
+    inactivity_for_worktree = Signal(str)  # Emits worktree path on inactivity
     
     def __init__(self, parent, command, cwd):
         super().__init__(parent)
         
+        # Remember which worktree this widget is for
+        self.cwd_path = str(cwd)
+
         self.bridge = TerminalBridge()
         self.bridge.data_received.connect(self._on_data_received)
         self.bridge.inactivity_detected.connect(self._on_inactivity_detected)
@@ -211,10 +227,10 @@ class WebTerminalWidget(QWidget):
             self.web_view.page().runJavaScript("window.writeToTerminal('Failed to start terminal session\\r\\n')")
     
     def _on_data_received(self, data):
-        """Handle data received from PTY."""
-        # Escape data for JavaScript and send to terminal
-        escaped_data = json.dumps(data)
-        js_code = f"window.writeToTerminal({escaped_data})"
+        """Handle data received from PTY (base64-encoded bytes)."""
+        # Data is base64 string; pass directly to the JS base64 writer
+        escaped_b64 = json.dumps(data)
+        js_code = f"window.writeToTerminalBase64({escaped_b64})"
         self.web_view.page().runJavaScript(js_code)
     
     def _load_notification_sound(self):
@@ -232,6 +248,8 @@ class WebTerminalWidget(QWidget):
         # Play the sound effect from PySide6
         if self.sound_effect.source():
             self.sound_effect.play()
+        # Notify listeners (e.g., main window/sidebar) with the worktree path
+        self.inactivity_for_worktree.emit(self.cwd_path)
     
     def closeEvent(self, event):
         """Clean up when closing."""

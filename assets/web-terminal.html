@@ -24,10 +24,13 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.4.0/lib/xterm-addon-unicode11.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.14.0/lib/xterm-addon-webgl.js"></script>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 
     <script>
         // Create terminal instance with proper CR/LF handling
+        var DEBUG = false;
         var terminal = new Terminal({
             theme: {
                 background: '#000000',
@@ -67,15 +70,27 @@
             rightClickSelectsWord: true,
             convertEol: false,  // Disable to fix animation newline issues
             scrollOnUserInput: false,  // Don't auto-scroll
-            disableStdin: false
+            disableStdin: false,
+            allowProposedApi: true
         });
 
         // Add addons
         var fitAddon = new FitAddon.FitAddon();
         var webLinksAddon = new WebLinksAddon.WebLinksAddon();
+        var unicode11Addon = new Unicode11Addon.Unicode11Addon();
 
         terminal.loadAddon(fitAddon);
         terminal.loadAddon(webLinksAddon);
+        terminal.loadAddon(unicode11Addon);
+        try {
+            var webglAddon = new WebglAddon.WebglAddon();
+            terminal.loadAddon(webglAddon);
+            if (DEBUG) console.log('WebGL renderer enabled');
+        } catch (e) {
+            if (DEBUG) console.log('WebGL addon unavailable:', e);
+        }
+        // Ensure correct Unicode width handling
+        terminal.unicode.activeVersion = '11';
 
         // Open terminal
         terminal.open(document.getElementById('terminal'));
@@ -93,7 +108,7 @@
             if (qtBridge) {
                 qtBridge.write_to_pty(data);
             } else {
-                console.log('Qt bridge not ready, data:', data);
+                if (DEBUG) console.log('Qt bridge not ready, data:', data);
             }
         });
 
@@ -144,43 +159,81 @@
             handleResize();
         }, 500);
 
-        // Throttling for animation updates
-        var writeBuffer = '';
-        var writeTimer = null;
-        var isWriting = false;
-        
-        function flushWriteBuffer() {
-            if (writeBuffer && !isWriting) {
-                isWriting = true;
-                terminal.write(writeBuffer);
-                writeBuffer = '';
-                setTimeout(function() {
-                    isWriting = false;
-                }, 16); // ~60fps limit
+        // rAF-based never-drop queue for terminal writes (strings or Uint8Array)
+        var pending = [];
+        var scheduled = false;
+
+        function writeItem(item) {
+            if (item instanceof Uint8Array) {
+                try {
+                    terminal.write(item);
+                } catch (e) {
+                    // Fallback: decode bytes to UTF-8 string
+                    if (!window.__xtermTextDecoder) {
+                        try { window.__xtermTextDecoder = new TextDecoder('utf-8'); } catch (_) { window.__xtermTextDecoder = null; }
+                    }
+                    if (window.__xtermTextDecoder) {
+                        try { terminal.write(window.__xtermTextDecoder.decode(item)); } catch (e2) { if (DEBUG) console.log('decode fallback failed', e2); }
+                    }
+                }
+            } else {
+                terminal.write(item);
             }
         }
 
-        // Global function to write data to terminal
-        window.writeToTerminal = function(data) {
-            // Debug logging for animation issues
-            if (data.includes('\r') || data.includes('\n')) {
-                console.log('[DEBUG] Terminal write with CR/LF:', JSON.stringify(data));
-                if (data.length > 1 && data.includes('\r') && data.includes('\n')) {
-                    console.log('[DEBUG] Mixed CR/LF in JS, length:', data.length);
-                }
+        function flushPending() {
+            scheduled = false;
+            if (!pending.length) return;
+            var batch = pending;
+            pending = [];
+            for (var i = 0; i < batch.length; i++) {
+                writeItem(batch[i]);
             }
+        }
 
-            // Buffer rapid animation updates to reduce rendering frequency
-            writeBuffer += data;
-            
-            clearTimeout(writeTimer);
-            writeTimer = setTimeout(flushWriteBuffer, 8); // Small delay for batching
+        function scheduleFlush() {
+            if (scheduled) return;
+            scheduled = true;
+            if (window.requestAnimationFrame) {
+                requestAnimationFrame(flushPending);
+            } else {
+                setTimeout(flushPending, 16);
+            }
+        }
+
+        // Global functions to write data to terminal
+        window.writeToTerminal = function(data) {
+            if (DEBUG && (data.indexOf('\r') !== -1 || data.indexOf('\n') !== -1)) {
+                console.log('[DEBUG] writeToTerminal CR/LF len:', data.length);
+            }
+            pending.push(data);
+            scheduleFlush();
+        };
+
+        function base64ToUint8Array(b64) {
+            var binary = atob(b64);
+            var len = binary.length;
+            var bytes = new Uint8Array(len);
+            for (var i = 0; i < len; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        window.writeToTerminalBase64 = function(b64) {
+            try {
+                var bytes = base64ToUint8Array(b64);
+                pending.push(bytes);
+                scheduleFlush();
+            } catch (e) {
+                if (DEBUG) console.log('Base64 decode failed:', e);
+            }
         };
 
         // Focus terminal
         terminal.focus();
 
-        console.log('Terminal initialized');
+        if (DEBUG) console.log('Terminal initialized');
     </script>
 </body>
 </html>
