@@ -1,6 +1,8 @@
 ### Code Cadet 
 <small>Coding Agents + Git Worktrees = 💙</small>
 
+**🚧 Beta Software - Under Active Development 🚧**
+
 A desktop application for managing Git worktrees, built with Python and PySide6.
 
 ## Overview
@@ -34,6 +36,10 @@ Run the application:
 ```bash
 python main.py
 ```
+
+## Status
+
+This project is currently in **beta**. Features may change, and bugs are expected. Please report issues and feedback as you encounter them.
 
 ## Disclaimer
 

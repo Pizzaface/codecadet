@@ -10,7 +10,6 @@ def find_graphite_cli() -> Optional[str]:
     """Find the Graphite CLI executable."""
     # Common locations for gt command
     possible_paths = [
-        "/home/jordan/.nvm/versions/node/v20.17.0/bin/gt",  # Known location
         shutil.which("gt"),  # Standard PATH lookup
         str(Path.home() / ".nvm/versions/node/v20.17.0/bin/gt"),
         str(Path.home() / ".local/bin/gt"),
