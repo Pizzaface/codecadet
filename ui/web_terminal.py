@@ -124,6 +124,9 @@ class TerminalBridge(QObject):
             if self.last_output_time:
                 if (time.time() - self.last_output_time) >= INACTIVITY_TIMER:
                     self.inactivity_triggered = True
+                    # Stop checking until the next explicit submit (Enter)
+                    # This ensures we only notify once per user-submitted request.
+                    self.tracking_enabled = False
                     self.inactivity_detected.emit()
     
     @Slot(str)

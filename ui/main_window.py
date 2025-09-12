@@ -237,10 +237,14 @@ class App(QMainWindow):
         Shows a subtle indicator on the sidebar if the worktree is not selected.
         """
         try:
+            # Always play the notification sound when inactivity (completion) is detected,
+            # even if we're currently viewing the same worktree.
+            self._play_notification_sound()
+
+            # Only set the sidebar attention indicator if it's not the selected worktree.
             selected = self.sidebar.get_selected_worktree()
             if not selected or selected != path:
                 self.sidebar.set_attention_for_path(path, True)
-                self._play_notification_sound()
         except Exception:
             pass
 

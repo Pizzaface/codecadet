@@ -255,24 +255,49 @@ class TerminalPane(QWidget):
 
         claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
 
-        # Command that starts in the worktree directory with Poetry available
-        # We explicitly preserve PATH and source appropriate profile for user tools
+        # Command that starts in the worktree directory with common developer environments available
+        # We explicitly preserve PATH and source appropriate profile files for user tools
         # Properly escape the PATH to handle spaces and special characters
-        current_path = os.environ.get("PATH", "")
-        # Add common Poetry/pyenv paths that might not be in the parent's PATH
-        additional_paths = "$HOME/.local/bin:$HOME/.poetry/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:$HOME/.nvm/versions/node/v20.17.0/bin"
+        # Current PATH is not used directly; we rely on sourced profiles' PATH and append common paths.
+        # Common developer tool paths that may not be present depending on how the app was launched
+        # (Finder-launched apps often inherit a minimal PATH on macOS)
+        additional_paths = ":".join([
+            "$HOME/.local/bin",
+            "$HOME/.poetry/bin",
+            "$HOME/.pyenv/bin",
+            "$HOME/.pyenv/shims",
+            "$HOME/.asdf/bin",
+            "$HOME/.asdf/shims",
+            "$HOME/.rtx/bin",
+            "$HOME/.deno/bin",
+            "$HOME/.cargo/bin",
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/local/sbin",
+        ])
         
         # Choose appropriate shell and profile based on platform
         if sys.platform == "darwin":
             shell_cmd = "zsh"
-            profile_source = "source ~/.zshrc 2>/dev/null || source ~/.zprofile 2>/dev/null || true"
+            # Source all relevant zsh and profile files if present, then ensure Homebrew env if available.
+            profile_source = (
+                "for f in /etc/zshenv /etc/zprofile /etc/profile ~/.zshenv ~/.zprofile ~/.profile ~/.zshrc; "
+                "do [ -f \"$f\" ] && . \"$f\"; done; "
+                "eval \"$('/opt/homebrew/bin/brew' shellenv)\" 2>/dev/null || "
+                "eval \"$('/usr/local/bin/brew' shellenv)\" 2>/dev/null || true"
+            )
         else:
             shell_cmd = "bash"
-            profile_source = "source ~/.bashrc 2>/dev/null || true"
+            # Source common bash profile files on Linux; cover login and non-login shells.
+            profile_source = (
+                "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
+                "do [ -f \"$f\" ] && . \"$f\"; done"
+            )
         
         bash_command = (
-            f'{profile_source}; '  # Source user's profile for any additional setup
-            f'export PATH={shlex.quote(current_path)}:{additional_paths}; '  # Import global PATH plus common tool paths
+            f'{profile_source}; '  # Source user/system profiles for environment setup
+            f'export PATH="$PATH":{additional_paths}; '  # Extend PATH with common tool locations, preserving profile changes
             f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
             f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
             f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
@@ -458,15 +483,14 @@ class TerminalPane(QWidget):
         return None
 
     def _on_session_inactivity(self, path_str: str):
-        """Receive inactivity from a terminal session and notify the app/sidebar if not selected."""
+        """Receive inactivity from a terminal session and notify the app/sidebar."""
         try:
             from pathlib import Path
-            selected = self.get_selected_cwd()
             session_path = Path(path_str)
-            if not selected or selected != session_path:
-                app = self._get_main_app()
-                if app and hasattr(app, 'notify_inactivity'):
-                    app.notify_inactivity(session_path)
+            # Always notify the app so it can handle sound and indicators appropriately
+            app = self._get_main_app()
+            if app and hasattr(app, 'notify_inactivity'):
+                app.notify_inactivity(session_path)
         except Exception:
             pass
 
