@@ -22,6 +22,16 @@ class TerminalPane(QWidget):
     Shows/hides the appropriate session when switching worktrees.
     """
 
+    @staticmethod
+    def _remove_path_entry(path_value: str, entry: str) -> str:
+        """Remove all occurrences of `entry` from a PATH-like string."""
+        if not path_value or not entry:
+            return path_value
+        sep = os.pathsep
+        parts = path_value.split(sep)
+        cleaned = [part for part in parts if part != entry]
+        return sep.join(cleaned)
+
     def __init__(self, parent, get_selected_cwd, claude_cmd_getter, config_getter=None):
         super().__init__(parent)
         self.get_selected_cwd = get_selected_cwd
@@ -276,6 +286,31 @@ class TerminalPane(QWidget):
             "/usr/local/bin",
             "/usr/local/sbin",
         ])
+
+        app_dir = Path(__file__).parent.parent
+        venv_bin_dir = app_dir / ".venv" / ("Scripts" if sys.platform.startswith("win") else "bin")
+        app_venv_bin_str = os.fspath(venv_bin_dir)
+
+        path_cleanup_snippet = ""
+        if not sys.platform.startswith("win") and app_venv_bin_str:
+            escaped_app_venv_bin = (
+                app_venv_bin_str
+                .replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("$", "\\$")
+            )
+            path_cleanup_snippet = (
+                f'APP_VENV_BIN="{escaped_app_venv_bin}"; '
+                'PATH="$(printf \'%s\' "$PATH" | awk -v RS=: -v ORS=: -v target="$APP_VENV_BIN" \'$0 != target\')"; '
+                'PATH="${PATH%:}"; '
+                'unset APP_VENV_BIN; '
+            )
+
+        path_append_snippet = (
+            f'PATH_EXTRAS="{additional_paths}"; '
+            'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
+            'unset PATH_EXTRAS; '
+        )
         
         # Choose appropriate shell and profile based on platform
         if sys.platform == "darwin":
@@ -296,8 +331,10 @@ class TerminalPane(QWidget):
             )
         
         bash_command = (
+            f'{path_cleanup_snippet}'
             f'{profile_source}; '  # Source user/system profiles for environment setup
-            f'export PATH="$PATH":{additional_paths}; '  # Extend PATH with common tool locations, preserving profile changes
+            f'{path_cleanup_snippet}'
+            f'{path_append_snippet}'  # Extend PATH with common tool locations, preserving profile changes
             f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
             f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
             f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
@@ -313,7 +350,7 @@ class TerminalPane(QWidget):
             self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
         else:
             # Linux: Use xterm embedding
-            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid)
+            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
 
     def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
         """Start a PTY-based terminal for Mac."""
@@ -420,7 +457,7 @@ class TerminalPane(QWidget):
             container.deleteLater()
             self._show_no_session()
 
-    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid):
+    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin=None):
         """Start xterm-based terminal for Linux."""
         cmdline = [
             "xterm",
@@ -443,7 +480,7 @@ class TerminalPane(QWidget):
         try:
             # Pass the parent's full environment to preserve PATH and other variables
             env = os.environ.copy()
-            
+
             # Clear ONLY the virtual environment variables that would confuse Poetry
             # about which project to use, but keep PATH intact
             app_dir = Path(__file__).parent.parent
@@ -454,7 +491,16 @@ class TerminalPane(QWidget):
                     env.pop('VIRTUAL_ENV', None)
                     env.pop('POETRY_ACTIVE', None)
                     # But do NOT modify PATH - Poetry binary should still be accessible
-            
+
+            if app_venv_bin:
+                env_path = env.get('PATH')
+                if env_path:
+                    cleaned_path = self._remove_path_entry(env_path, app_venv_bin)
+                    if cleaned_path:
+                        env['PATH'] = cleaned_path
+                    else:
+                        env['PATH'] = os.defpath
+
             # Using cwd parameter ensures the process starts in the worktree directory
             proc = subprocess.Popen(cmdline, cwd=str(cwd), env=env)
 

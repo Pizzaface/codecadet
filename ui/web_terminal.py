@@ -120,14 +120,20 @@ class TerminalBridge(QObject):
         if self._awaiting_output:
             return
         if not self.inactivity_triggered and self._activity_seen:
-            # Only consider last output time to avoid false positives from input
-            if self.last_output_time:
-                if (time.time() - self.last_output_time) >= INACTIVITY_TIMER:
-                    self.inactivity_triggered = True
-                    # Stop checking until the next explicit submit (Enter)
-                    # This ensures we only notify once per user-submitted request.
-                    self.tracking_enabled = False
-                    self.inactivity_detected.emit()
+            now = time.time()
+
+            # If the user is still interacting with the terminal (typing, navigation
+            # keys, etc.), treat that as activity and defer inactivity notification.
+            if self.last_input_time and (now - self.last_input_time) < INACTIVITY_TIMER:
+                return
+
+            # Only consider last output time once we're outside the interaction window
+            if self.last_output_time and (now - self.last_output_time) >= INACTIVITY_TIMER:
+                self.inactivity_triggered = True
+                # Stop checking until the next explicit submit (Enter)
+                # This ensures we only notify once per user-submitted request.
+                self.tracking_enabled = False
+                self.inactivity_detected.emit()
     
     @Slot(str)
     def write_to_pty(self, data):
