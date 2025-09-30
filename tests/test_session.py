@@ -224,16 +224,11 @@ class TestSessionManager:
         self.session_manager.register_session(path1, process1, Mock(), "bash")
         self.session_manager.register_session(path2, process2, Mock(), "zsh")
         
-        # Mock both processes as running
-        process1.poll.return_value = None
-        process2.poll.return_value = None
-        
         sessions = self.session_manager.get_all_sessions()
         
         assert len(sessions) == 2
-        session_paths = [s.worktree_path for s in sessions]
-        assert path1 in session_paths
-        assert path2 in session_paths
+        assert str(path1) in sessions
+        assert str(path2) in sessions
 
     def test_get_all_sessions_filters_terminated(self):
         """Test that get_all_sessions filters out terminated sessions."""
@@ -361,3 +356,4 @@ class TestSessionManager:
         """Test terminating all sessions when none exist."""
         terminated_count = self.session_manager.terminate_all_sessions()
         assert terminated_count == 0
+
