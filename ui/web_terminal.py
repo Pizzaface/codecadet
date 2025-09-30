@@ -196,8 +196,8 @@ class TerminalBridge(QObject):
         if self.master_fd:
             try:
                 os.close(self.master_fd)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug(f"OSError closing master fd: {e}")
             self.master_fd = None
         
         if self.process_pid:
@@ -308,6 +308,7 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
 
