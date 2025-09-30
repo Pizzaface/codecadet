@@ -5,17 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-
-# Mock QWidget to avoid GUI dependencies in tests
-class MockQWidget:
-    pass
-
-# Import models with mocked dependencies
-import sys
-from unittest.mock import MagicMock
-sys.modules['PySide6'] = MagicMock()
-sys.modules['PySide6.QtWidgets'] = MagicMock()
-sys.modules['PySide6.QtWidgets'].QWidget = MockQWidget
+from PySide6.QtWidgets import QWidget
 
 from models import WorktreeInfo, SessionInfo
 
@@ -122,5 +112,6 @@ class TestSessionInfo:
                 start_time=0.0
             )
             assert session.status == status
+
 
 
