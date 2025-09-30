@@ -75,9 +75,8 @@ def save_config(cfg: dict):
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
         tmp.replace(_config_path())
-        logger.debug(f"Configuration saved to {_config_path()}")
-    except Exception as e:
-        logger.error(f"Failed to save configuration: {e}", exc_info=True)
+    except Exception:
+        pass
 
 
 def push_recent_repo(cfg: dict, repo_root: Path):
@@ -189,6 +188,7 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
 
