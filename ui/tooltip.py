@@ -3,6 +3,9 @@
 from PySide6.QtCore import QTimer, Qt, QPoint, QObject
 from PySide6.QtGui import QEnterEvent, QFont, QPalette
 from PySide6.QtWidgets import QWidget, QLabel, QFrame, QApplication
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ToolTip(QObject):
@@ -200,3 +203,4 @@ def add_tooltip(widget: QWidget, text: str, delay: int = 500, wraplength: int = 
 def add_tooltip_to_button(button: QWidget, text: str, delay: int = 400) -> ToolTip:
     """Convenience function specifically for buttons with shorter delay."""
     return ToolTip(button, text, delay, wraplength=250)
+
