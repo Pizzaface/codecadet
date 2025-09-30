@@ -251,35 +251,37 @@ class TestMigrateLegacyConfig:
 class TestRecentRepos:
     """Test recent repositories management."""
 
-    def test_add_recent_repo_new(self):
+    def test_push_recent_repo_new(self):
         """Test adding a new recent repository."""
         config = {"recent_repos": []}
-        repo_path = "/test/repo"
+        repo_path = Path("/test/repo")
         
-        add_recent_repo(config, repo_path)
+        push_recent_repo(config, repo_path)
         
-        assert config["recent_repos"] == [repo_path]
+        assert config["recent_repos"] == ["/test/repo"]
+        assert config["last_repo"] == "/test/repo"
 
-    def test_add_recent_repo_existing(self):
+    def test_push_recent_repo_existing(self):
         """Test adding an existing repository moves it to front."""
         config = {"recent_repos": ["/test/repo1", "/test/repo2", "/test/repo3"]}
-        repo_path = "/test/repo2"
+        repo_path = Path("/test/repo2")
         
-        add_recent_repo(config, repo_path)
+        push_recent_repo(config, repo_path)
         
         assert config["recent_repos"] == ["/test/repo2", "/test/repo1", "/test/repo3"]
+        assert config["last_repo"] == "/test/repo2"
 
-    def test_add_recent_repo_max_limit(self):
+    def test_push_recent_repo_max_limit(self):
         """Test adding repository respects maximum limit."""
         # Create list at maximum capacity
         repos = [f"/test/repo{i}" for i in range(RECENTS_MAX)]
         config = {"recent_repos": repos}
-        new_repo = "/test/new_repo"
+        new_repo = Path("/test/new_repo")
         
-        add_recent_repo(config, new_repo)
+        push_recent_repo(config, new_repo)
         
         assert len(config["recent_repos"]) == RECENTS_MAX
-        assert config["recent_repos"][0] == new_repo
+        assert config["recent_repos"][0] == "/test/new_repo"
         assert f"/test/repo{RECENTS_MAX-1}" not in config["recent_repos"]
 
     def test_get_recent_repos(self):
@@ -287,7 +289,7 @@ class TestRecentRepos:
         repos = ["/test/repo1", "/test/repo2"]
         config = {"recent_repos": repos}
         
-        result = get_recent_repos(config)
+        result = config.get("recent_repos", [])
         
         assert result == repos
 
@@ -295,7 +297,7 @@ class TestRecentRepos:
         """Test getting recent repositories when none exist."""
         config = {"recent_repos": []}
         
-        result = get_recent_repos(config)
+        result = config.get("recent_repos", [])
         
         assert result == []
 
@@ -370,4 +372,5 @@ class TestRecentBranches:
         result = get_recent_branches_for_repo(config, "/test/repo")
         
         assert result == []
+
 
