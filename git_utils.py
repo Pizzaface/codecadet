@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import List
 
 from models import WorktreeInfo
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def which(cmd: str) -> str | None:
@@ -145,3 +148,4 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
