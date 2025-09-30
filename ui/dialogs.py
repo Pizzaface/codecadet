@@ -10,6 +10,9 @@ from PySide6.QtWidgets import (
 
 from clipboard import setup_entry_clipboard
 from .tooltip import add_tooltip, add_tooltip_to_button
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class CreateDialog(QDialog):
@@ -567,3 +570,4 @@ class AgentConfigDialog(QDialog):
         # Save the embed terminal preference
         self.config["embed_terminal"] = self.embed_checkbox.isChecked()
         self.accept()
+
