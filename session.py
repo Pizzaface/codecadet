@@ -28,6 +28,7 @@ class SessionManager:
             command=command,
             start_time=time.time()
         )
+        logger.info(f"Registered terminal session for worktree {worktree_path} with command: {command}")
 
     def get_session(self, worktree_path: Path) -> SessionInfo | None:
         """Get session info for a worktree if it exists and is active."""
@@ -76,4 +77,5 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
