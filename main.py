@@ -6,11 +6,14 @@ Entry point for the modular application.
 """
 
 import sys
+import time
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from ui.main_window import App
 from logging_config import setup_logging, get_logger, configure_qt_logging
+from config import _config_dir
+from metrics import initialize_metrics, finalize_metrics, record_startup_time
 
 # Setup logging
 setup_logging(level="INFO", log_to_file=True, log_to_console=True)
@@ -54,5 +57,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"Fatal error during application startup: {e}", exc_info=True)
         sys.exit(1)
+
 
 
