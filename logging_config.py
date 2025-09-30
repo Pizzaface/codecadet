@@ -3,12 +3,11 @@
 import json
 import logging
 import logging.handlers
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
-
-from config import _config_dir
 
 
 class JSONFormatter(logging.Formatter):
@@ -176,3 +175,4 @@ def configure_qt_logging():
 
 # Module-level logger instances for common use
 logger = get_logger(__name__)
+
