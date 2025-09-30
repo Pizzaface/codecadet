@@ -11,8 +11,7 @@ import pytest
 from config import (
     APP_NAME, RECENTS_MAX, RECENT_BRANCHES_MAX, DEFAULT_CONFIG,
     _config_dir, _config_path, load_config, save_config,
-    migrate_legacy_config, add_recent_repo, get_recent_repos,
-    add_recent_branch, get_recent_branches_for_repo
+    migrate_legacy_config, push_recent_repo, push_recent_branch, get_recent_branches
 )
 
 
@@ -371,3 +370,4 @@ class TestRecentBranches:
         result = get_recent_branches_for_repo(config, "/test/repo")
         
         assert result == []
+
