@@ -232,8 +232,8 @@ class App(QMainWindow):
                 if (now - self._last_sound_time) >= 4.0:
                     self._notif_sound.play()
                     self._last_sound_time = now
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to play notification sound: {e}")
 
     def notify_inactivity(self, path: Path):
         """Called when a background terminal session becomes inactive.
@@ -900,4 +900,5 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
