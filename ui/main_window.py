@@ -891,16 +891,17 @@ class App(QMainWindow):
             if self.repo_root:
                 self.cfg["last_repo"] = str(self.repo_root)
             save_config(self.cfg)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to save configuration on close: {e}", exc_info=True)
         
         # Clean up all terminal sessions
         try:
             self.term.cleanup_all_sessions()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to cleanup terminal sessions on close: {e}", exc_info=True)
         
         event.accept()
+
 
 
 
