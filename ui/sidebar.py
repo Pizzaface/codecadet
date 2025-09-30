@@ -891,5 +891,7 @@ class BranchSelectionDialog(QDialog):
             QMessageBox.information(self, "Success", f"Switched to: {branch}")
             self.accept()
         except Exception as e:
+            logger.error(f"Failed to switch to branch {branch}: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", str(e))
+
 
