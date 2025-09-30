@@ -59,7 +59,7 @@ class TestSessionInfo:
         """Test creating a SessionInfo instance."""
         path = Path("/test/worktree")
         process = Mock(spec=subprocess.Popen)
-        widget = Mock(spec=MockQWidget)
+        widget = Mock(spec=QWidget)
         start_time = 1234567890.0
         
         session = SessionInfo(
@@ -112,6 +112,7 @@ class TestSessionInfo:
                 start_time=0.0
             )
             assert session.status == status
+
 
 
 
