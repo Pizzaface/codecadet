@@ -323,7 +323,8 @@ class PTYTerminalWidget(QTextEdit):
             # Fallback - just display raw text with better error handling
             try:
                 fallback_text = data.decode('utf-8', errors='replace').replace('\ufffd', ' ')
-            except:
+            except (UnicodeDecodeError, AttributeError) as e:
+                logger.debug(f"Failed to decode terminal data as UTF-8: {e}")
                 fallback_text = str(data, errors='ignore')
             
             cursor = self.textCursor()
@@ -515,4 +516,5 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
 
