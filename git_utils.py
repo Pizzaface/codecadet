@@ -2,11 +2,13 @@
 
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import List
 
 from models import WorktreeInfo
 from logging_config import get_logger
+from metrics import record_worktree_operation, record_error, time_operation
 
 logger = get_logger(__name__)
 
@@ -154,6 +156,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
