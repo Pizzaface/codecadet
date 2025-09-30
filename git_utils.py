@@ -22,6 +22,11 @@ def run_git(args, cwd=None, check=True):
     """Run a git command with safe argument passing."""
     cmd = ["git"] + list(args)
     logger.debug(f"Running git command: {' '.join(cmd)} in {cwd or 'current directory'}")
+    
+    start_time = time.time()
+    success = True
+    error_msg = None
+    
     try:
         cp = subprocess.run(
             cmd,
@@ -34,12 +39,27 @@ def run_git(args, cwd=None, check=True):
         logger.debug(f"Git command completed with return code {cp.returncode}")
         return cp
     except FileNotFoundError as e:
-        logger.error("Git not found on PATH")
-        raise RuntimeError("Git not found on PATH.")
+        success = False
+        error_msg = "Git not found on PATH"
+        logger.error(error_msg)
+        record_error("git_not_found", error_msg, {"command": cmd})
+        raise RuntimeError(error_msg)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Git command failed: {e.stderr.strip() or str(e)}")
-        # surface stderr to caller
-        raise RuntimeError(e.stderr.strip() or str(e))
+        success = False
+        error_msg = e.stderr.strip() or str(e)
+        logger.error(f"Git command failed: {error_msg}")
+        record_error("git_command_failed", error_msg, {"command": cmd, "return_code": e.returncode})
+        raise RuntimeError(error_msg)
+    finally:
+        # Record Git command metrics
+        duration_ms = (time.time() - start_time) * 1000
+        try:
+            from metrics import get_metrics_collector
+            collector = get_metrics_collector()
+            if collector:
+                collector.record_git_command(cmd, success, duration_ms)
+        except Exception:
+            pass  # Don't let metrics recording break Git operations
 
 
 def ensure_repo_root(path: Path) -> Path:
@@ -156,6 +176,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
