@@ -26,6 +26,12 @@ DEFAULT_CONFIG = {
         }
     },
     "default_agent": "claude",  # str - default agent to use
+    "metrics": {  # dict - metrics and telemetry configuration
+        "enable_telemetry": False,  # bool - enable anonymous telemetry
+        "enable_performance_tracking": True,  # bool - enable performance benchmarks
+        "enable_error_tracking": True,  # bool - enable error metrics
+        "data_retention_days": 30,  # int - how long to keep metrics data
+    },
 }
 
 
@@ -188,6 +194,7 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
 
