@@ -133,15 +133,30 @@ def list_worktrees(repo_root: Path) -> list[WorktreeInfo]:
 
 def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: str | None):
     """Add a new worktree."""
-    args = ["-C", str(repo_root), "worktree", "add"]
-    if branch:
-        exists = run_git(["-C", str(repo_root), "rev-parse", "--verify", f"refs/heads/{branch}"], check=False)
-        if exists.returncode != 0:
-            args += ["-b", branch]
-    args.append(str(new_path))
-    if base_ref:
-        args.append(base_ref)
-    run_git(args)
+    start_time = time.time()
+    success = True
+    error_msg = None
+    
+    try:
+        args = ["-C", str(repo_root), "worktree", "add"]
+        if branch:
+            exists = run_git(["-C", str(repo_root), "rev-parse", "--verify", f"refs/heads/{branch}"], check=False)
+            if exists.returncode != 0:
+                args += ["-b", branch]
+        args.append(str(new_path))
+        if base_ref:
+            args.append(base_ref)
+        run_git(args)
+        logger.info(f"Successfully added worktree at {new_path}")
+    except Exception as e:
+        success = False
+        error_msg = str(e)
+        logger.error(f"Failed to add worktree at {new_path}: {e}")
+        raise
+    finally:
+        # Record worktree operation metrics
+        duration_ms = (time.time() - start_time) * 1000
+        record_worktree_operation("add_worktree", success, duration_ms, error_msg)
 
 
 def remove_worktree(repo_root: Path, wt_path: Path, force=False):
@@ -176,6 +191,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
