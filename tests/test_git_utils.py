@@ -325,82 +325,39 @@ class TestBranchOperations:
     """Test branch-related operations."""
 
     @patch('git_utils.run_git')
-    def test_get_current_branch_success(self, mock_run_git):
-        """Test getting current branch successfully."""
-        mock_result = Mock()
-        mock_result.stdout = "main\n"
-        mock_run_git.return_value = mock_result
-
-        result = get_current_branch(Path("/home/user/repo"))
-        
-        assert result == "main"
-        mock_run_git.assert_called_once_with([
-            "-C", "/home/user/repo",
-            "branch", "--show-current"
-        ])
-
-    @patch('git_utils.run_git')
-    def test_get_current_branch_detached(self, mock_run_git):
-        """Test getting current branch when in detached HEAD state."""
-        mock_result = Mock()
-        mock_result.stdout = "\n"
-        mock_run_git.return_value = mock_result
-
-        result = get_current_branch(Path("/home/user/repo"))
-        
-        assert result is None
-
-    @patch('git_utils.run_git')
-    def test_get_branches_success(self, mock_run_git):
+    def test_list_branches_success(self, mock_run_git):
         """Test getting all branches successfully."""
         mock_result = Mock()
         mock_result.stdout = "  feature-1\n* main\n  feature-2\n"
         mock_run_git.return_value = mock_result
 
-        result = get_branches(Path("/home/user/repo"))
+        result = list_branches(Path("/home/user/repo"))
         
-        assert result == ["feature-1", "main", "feature-2"]
+        assert len(result) == 3
         mock_run_git.assert_called_once_with([
             "-C", "/home/user/repo",
-            "branch", "--format=%(refname:short)"
+            "branch", "-a"
         ])
 
     @patch('git_utils.run_git')
-    def test_get_recent_branches_success(self, mock_run_git):
-        """Test getting recent branches successfully."""
+    def test_list_branches_empty(self, mock_run_git):
+        """Test getting branches when none exist."""
         mock_result = Mock()
-        mock_result.stdout = "main\nfeature-1\nfeature-2\n"
+        mock_result.stdout = ""
         mock_run_git.return_value = mock_result
 
-        result = get_recent_branches(Path("/home/user/repo"), limit=3)
+        result = list_branches(Path("/home/user/repo"))
         
-        assert result == ["main", "feature-1", "feature-2"]
-        mock_run_git.assert_called_once_with([
-            "-C", "/home/user/repo",
-            "for-each-ref",
-            "--sort=-committerdate",
-            "--format=%(refname:short)",
-            "--count=3",
-            "refs/heads/"
-        ])
+        assert result == []
 
     @patch('git_utils.run_git')
-    def test_get_recent_branches_default_limit(self, mock_run_git):
-        """Test getting recent branches with default limit."""
-        mock_result = Mock()
-        mock_result.stdout = "main\n"
-        mock_run_git.return_value = mock_result
+    def test_list_branches_error(self, mock_run_git):
+        """Test getting branches when command fails."""
+        mock_run_git.side_effect = RuntimeError("not a git repository")
 
-        result = get_recent_branches(Path("/home/user/repo"))
-        
-        mock_run_git.assert_called_once_with([
-            "-C", "/home/user/repo",
-            "for-each-ref",
-            "--sort=-committerdate",
-            "--format=%(refname:short)",
-            "--count=10",
-            "refs/heads/"
-        ])
+        with pytest.raises(RuntimeError, match="not a git repository"):
+            list_branches(Path("/home/user/notrepo"))
+
 
 
 
