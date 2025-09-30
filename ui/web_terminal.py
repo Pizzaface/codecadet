@@ -203,8 +203,8 @@ class TerminalBridge(QObject):
         if self.process_pid:
             try:
                 os.kill(self.process_pid, 15)  # SIGTERM
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug(f"OSError killing process: {e}")
 
 
 class WebTerminalWidget(QWidget):
@@ -308,6 +308,7 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
 
