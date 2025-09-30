@@ -182,8 +182,8 @@ class TerminalBridge(QObject):
                 # Set the terminal size
                 s = struct.pack('HHHH', rows, cols, 0, 0)
                 fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug(f"OSError setting terminal size: {e}")
     
     def cleanup(self):
         """Clean up PTY resources."""
@@ -308,6 +308,7 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
 
