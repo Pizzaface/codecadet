@@ -157,8 +157,8 @@ class TerminalBridge(QObject):
         if self.master_fd and data:
             try:
                 os.write(self.master_fd, data.encode('utf-8'))
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug(f"OSError writing to master fd: {e}")
 
     def enable_tracking(self):
         """Arm inactivity tracking from now on."""
@@ -308,5 +308,6 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
