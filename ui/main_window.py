@@ -615,8 +615,8 @@ class App(QMainWindow):
                     x, y = map(int, pos_part.split('+'))
                     self.resize(width, height)
                     self.move(x, y)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to restore window geometry: {e}")
         
         if self.cfg.get("auto_reopen_last") and self.cfg.get("last_repo"):
             last = Path(self.cfg["last_repo"])
@@ -900,6 +900,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
