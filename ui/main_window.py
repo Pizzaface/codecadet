@@ -255,8 +255,8 @@ class App(QMainWindow):
         """Called when a session shows activity; clears the sidebar indicator."""
         try:
             self.sidebar.set_attention_for_path(path, False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to clear attention indicator for path {path}: {e}")
     
     def _setup_menus(self):
         """Setup the menu bar."""
@@ -900,6 +900,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
