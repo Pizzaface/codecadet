@@ -9,6 +9,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from git_utils import which
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def open_in_editor(path: Path):
@@ -110,4 +113,5 @@ def launch_terminal_only(cwd: Path):
             return
     # If no terminal found, show error
     QMessageBox.critical(None, "Error", "No supported terminal emulator found.")
+
 
