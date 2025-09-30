@@ -87,7 +87,7 @@ class TerminalBridge(QObject):
                 return True
                 
         except Exception as e:
-            pass  # Failed to start PTY
+            logger.error(f"Failed to start PTY: {e}", exc_info=True)
             return False
     
     def _read_pty(self):
@@ -308,4 +308,5 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
