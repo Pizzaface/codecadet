@@ -305,72 +305,73 @@ class TestRecentRepos:
 class TestRecentBranches:
     """Test recent branches management."""
 
-    def test_add_recent_branch_new_repo(self):
+    def test_push_recent_branch_new_repo(self):
         """Test adding branch for new repository."""
         config = {"recent_branches": {}}
-        repo_path = "/test/repo"
+        repo_path = Path("/test/repo")
         branch = "feature-branch"
         
-        add_recent_branch(config, repo_path, branch)
+        push_recent_branch(config, repo_path, branch)
         
-        assert config["recent_branches"][repo_path] == [branch]
+        assert config["recent_branches"]["/test/repo"] == [branch]
 
-    def test_add_recent_branch_existing_repo(self):
+    def test_push_recent_branch_existing_repo(self):
         """Test adding branch to existing repository."""
         config = {"recent_branches": {"/test/repo": ["main"]}}
-        repo_path = "/test/repo"
+        repo_path = Path("/test/repo")
         branch = "feature-branch"
         
-        add_recent_branch(config, repo_path, branch)
+        push_recent_branch(config, repo_path, branch)
         
-        assert config["recent_branches"][repo_path] == ["feature-branch", "main"]
+        assert config["recent_branches"]["/test/repo"] == ["feature-branch", "main"]
 
-    def test_add_recent_branch_existing_branch(self):
+    def test_push_recent_branch_existing_branch(self):
         """Test adding existing branch moves it to front."""
         config = {"recent_branches": {"/test/repo": ["main", "feature-1", "feature-2"]}}
-        repo_path = "/test/repo"
+        repo_path = Path("/test/repo")
         branch = "feature-1"
         
-        add_recent_branch(config, repo_path, branch)
+        push_recent_branch(config, repo_path, branch)
         
-        assert config["recent_branches"][repo_path] == ["feature-1", "main", "feature-2"]
+        assert config["recent_branches"]["/test/repo"] == ["feature-1", "main", "feature-2"]
 
-    def test_add_recent_branch_max_limit(self):
+    def test_push_recent_branch_max_limit(self):
         """Test adding branch respects maximum limit."""
         branches = [f"branch-{i}" for i in range(RECENT_BRANCHES_MAX)]
         config = {"recent_branches": {"/test/repo": branches}}
-        repo_path = "/test/repo"
+        repo_path = Path("/test/repo")
         new_branch = "new-branch"
         
-        add_recent_branch(config, repo_path, new_branch)
+        push_recent_branch(config, repo_path, new_branch)
         
-        assert len(config["recent_branches"][repo_path]) == RECENT_BRANCHES_MAX
-        assert config["recent_branches"][repo_path][0] == new_branch
-        assert f"branch-{RECENT_BRANCHES_MAX-1}" not in config["recent_branches"][repo_path]
+        assert len(config["recent_branches"]["/test/repo"]) == RECENT_BRANCHES_MAX
+        assert config["recent_branches"]["/test/repo"][0] == new_branch
+        assert f"branch-{RECENT_BRANCHES_MAX-1}" not in config["recent_branches"]["/test/repo"]
 
-    def test_get_recent_branches_for_repo_exists(self):
+    def test_get_recent_branches_exists(self):
         """Test getting recent branches for existing repository."""
         branches = ["main", "feature-1"]
         config = {"recent_branches": {"/test/repo": branches}}
         
-        result = get_recent_branches_for_repo(config, "/test/repo")
+        result = get_recent_branches(config, Path("/test/repo"))
         
         assert result == branches
 
-    def test_get_recent_branches_for_repo_not_exists(self):
+    def test_get_recent_branches_not_exists(self):
         """Test getting recent branches for non-existing repository."""
         config = {"recent_branches": {}}
         
-        result = get_recent_branches_for_repo(config, "/test/repo")
+        result = get_recent_branches(config, Path("/test/repo"))
         
         assert result == []
 
-    def test_get_recent_branches_for_repo_empty(self):
+    def test_get_recent_branches_empty(self):
         """Test getting recent branches for repository with empty list."""
         config = {"recent_branches": {"/test/repo": []}}
         
-        result = get_recent_branches_for_repo(config, "/test/repo")
+        result = get_recent_branches(config, Path("/test/repo"))
         
         assert result == []
+
 
 
