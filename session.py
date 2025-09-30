@@ -51,6 +51,21 @@ class SessionManager:
         path_str = str(worktree_path)
         if path_str in self.sessions:
             session = self.sessions[path_str]
+            
+            # Calculate session duration and record metrics
+            if hasattr(session, 'start_time') and session.start_time:
+                duration_seconds = time.time() - session.start_time
+                try:
+                    from metrics import get_metrics_collector
+                    collector = get_metrics_collector()
+                    if collector:
+                        # Estimate command count (simplified)
+                        command_count = 1  # Basic estimate, could be enhanced
+                        collector.record_terminal_session(duration_seconds, command_count)
+                        logger.debug(f"Recorded terminal session metrics: {duration_seconds:.1f}s")
+                except Exception as e:
+                    logger.debug(f"Failed to record session metrics: {e}")
+            
             # Terminate process if still running
             if session.process and session.process.poll() is None:
                 try:
@@ -58,6 +73,8 @@ class SessionManager:
                     logger.debug(f"Terminated process for session {worktree_path}")
                 except Exception as e:
                     logger.warning(f"Failed to terminate process for session {worktree_path}: {e}")
+                    record_error("session_termination_failed", str(e), {"worktree_path": str(worktree_path)})
+            
             # Destroy the container frame if it exists
             if session.container_frame:
                 try:
@@ -65,6 +82,8 @@ class SessionManager:
                     logger.debug(f"Destroyed container frame for session {worktree_path}")
                 except Exception as e:
                     logger.warning(f"Failed to destroy container frame for session {worktree_path}: {e}")
+                    record_error("container_frame_destroy_failed", str(e), {"worktree_path": str(worktree_path)})
+            
             del self.sessions[path_str]
 
     def get_all_sessions(self) -> Dict[str, SessionInfo]:
@@ -80,6 +99,7 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
 
