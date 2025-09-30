@@ -83,7 +83,7 @@ def setup_logging(
         Configured root logger
     """
     # Create logs directory
-    log_dir = _config_dir() / "logs"
+    log_dir = _get_config_dir() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     
     # Configure root logger
@@ -189,5 +189,6 @@ def configure_qt_logging():
 
 # Module-level logger instances for common use
 logger = get_logger(__name__)
+
 
 
