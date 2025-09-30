@@ -4,6 +4,9 @@ import os
 import sys
 import json
 from pathlib import Path
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 APP_NAME = "WorktreeManagerClaude"
 RECENTS_MAX = 15
@@ -181,3 +184,4 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
