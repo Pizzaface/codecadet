@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: multi-claude-coding
+Version: 0.1.0
+Summary: Git Worktree Manager - Desktop application for managing Git worktrees
+Requires-Python: >=3.11
+Requires-Dist: pyside6>=6.9.1
+Provides-Extra: test
+Requires-Dist: pytest>=7.0.0; extra == "test"
+Requires-Dist: pytest-cov>=4.0.0; extra == "test"
+Requires-Dist: pytest-mock>=3.10.0; extra == "test"
+Provides-Extra: dev
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Requires-Dist: pre-commit>=3.0.0; extra == "dev"
