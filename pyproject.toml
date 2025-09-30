@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "multi-claude-coding"
 version = "0.1.0"
@@ -6,6 +10,11 @@ requires-python = ">=3.11"
 dependencies = [
     "pyside6>=6.9.1",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "assets*"]
 
 [project.optional-dependencies]
 test = [
@@ -33,4 +42,5 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
+
 
