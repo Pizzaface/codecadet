@@ -14,6 +14,9 @@ from PySide6.QtWidgets import (
 
 from git_utils import which
 from terminal import launch_claude_in_terminal, launch_terminal_only
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class TerminalPane(QWidget):
@@ -581,3 +584,4 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
+
