@@ -689,7 +689,8 @@ class App(QMainWindow):
             return []
         try:
             return list_branches(self.repo_root)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to list branches for repository {self.repo_root}: {e}", exc_info=True)
             return []
 
     def _on_sidebar_select(self, worktree_info: WorktreeInfo):
@@ -900,6 +901,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
