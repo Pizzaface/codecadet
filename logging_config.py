@@ -9,6 +9,20 @@ from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
+APP_NAME = "WorktreeManagerClaude"
+
+
+def _get_config_dir() -> Path:
+    """Get the platform-specific configuration directory."""
+    if sys.platform.startswith("win"):
+        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return Path(base) / APP_NAME
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / APP_NAME
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+        return Path(base) / APP_NAME
+
 
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
@@ -175,4 +189,5 @@ def configure_qt_logging():
 
 # Module-level logger instances for common use
 logger = get_logger(__name__)
+
 
