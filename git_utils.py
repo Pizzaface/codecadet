@@ -55,9 +55,11 @@ def git_version_ok(min_major=2, min_minor=5) -> bool:
             nums = parts[2].split(".")
             major = int(nums[0])
             minor = int(nums[1])
-            return (major > min_major) or (major == min_major and minor >= min_minor)
-    except Exception:
-        pass
+            version_ok = (major > min_major) or (major == min_major and minor >= min_minor)
+            logger.debug(f"Git version {parts[2]} meets requirements (>= {min_major}.{min_minor}): {version_ok}")
+            return version_ok
+    except Exception as e:
+        logger.error(f"Failed to check Git version: {e}", exc_info=True)
     return False
 
 
@@ -152,5 +154,6 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
