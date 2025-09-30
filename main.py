@@ -10,6 +10,11 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from ui.main_window import App
+from logging_config import setup_logging, get_logger, configure_qt_logging
+
+# Setup logging
+setup_logging(level="INFO", log_to_file=True, log_to_console=True)
+logger = get_logger(__name__)
 
 if __name__ == "__main__":
     # Create QApplication instance
@@ -32,3 +37,4 @@ if __name__ == "__main__":
     
     # Run the event loop
     sys.exit(app.exec())
+
