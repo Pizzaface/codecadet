@@ -19,6 +19,7 @@ def which(cmd: str) -> str | None:
 def run_git(args, cwd=None, check=True):
     """Run a git command with safe argument passing."""
     cmd = ["git"] + list(args)
+    logger.debug(f"Running git command: {' '.join(cmd)} in {cwd or 'current directory'}")
     try:
         cp = subprocess.run(
             cmd,
@@ -28,10 +29,13 @@ def run_git(args, cwd=None, check=True):
             stderr=subprocess.PIPE,
             text=True,
         )
+        logger.debug(f"Git command completed with return code {cp.returncode}")
         return cp
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        logger.error("Git not found on PATH")
         raise RuntimeError("Git not found on PATH.")
     except subprocess.CalledProcessError as e:
+        logger.error(f"Git command failed: {e.stderr.strip() or str(e)}")
         # surface stderr to caller
         raise RuntimeError(e.stderr.strip() or str(e))
 
@@ -148,4 +152,5 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
