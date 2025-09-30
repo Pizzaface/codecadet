@@ -280,7 +280,7 @@ class TestRemoveWorktree:
 
         remove_worktree(
             repo_root=Path("/home/user/repo"),
-            path=Path("/home/user/repo-feature")
+            wt_path=Path("/home/user/repo-feature")
         )
         
         mock_run_git.assert_called_once_with([
@@ -298,14 +298,14 @@ class TestRemoveWorktree:
 
         remove_worktree(
             repo_root=Path("/home/user/repo"),
-            path=Path("/home/user/repo-feature"),
+            wt_path=Path("/home/user/repo-feature"),
             force=True
         )
         
         mock_run_git.assert_called_once_with([
             "-C", "/home/user/repo",
             "worktree", "remove",
-            "--force",
+            "-f",
             "/home/user/repo-feature"
         ])
 
@@ -317,7 +317,7 @@ class TestRemoveWorktree:
         with pytest.raises(RuntimeError, match="worktree not found"):
             remove_worktree(
                 repo_root=Path("/home/user/repo"),
-                path=Path("/home/user/repo-nonexistent")
+                wt_path=Path("/home/user/repo-nonexistent")
             )
 
 
@@ -401,5 +401,6 @@ class TestBranchOperations:
             "--count=10",
             "refs/heads/"
         ])
+
 
 
