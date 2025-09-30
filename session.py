@@ -54,14 +54,16 @@ class SessionManager:
             if session.process and session.process.poll() is None:
                 try:
                     session.process.terminate()
-                except Exception:
-                    pass
+                    logger.debug(f"Terminated process for session {worktree_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to terminate process for session {worktree_path}: {e}")
             # Destroy the container frame if it exists
             if session.container_frame:
                 try:
                     session.container_frame.destroy()
-                except Exception:
-                    pass
+                    logger.debug(f"Destroyed container frame for session {worktree_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to destroy container frame for session {worktree_path}: {e}")
             del self.sessions[path_str]
 
     def get_all_sessions(self) -> Dict[str, SessionInfo]:
@@ -77,5 +79,6 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
