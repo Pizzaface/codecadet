@@ -17,6 +17,9 @@ from graphite_utils import (is_graphite_repo, get_current_branch_info, GRAPHITE_
                            run_graphite_command, run_safe_graphite_command,
                            suggest_conflict_resolution)
 from .tooltip import add_tooltip_to_button, add_tooltip
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SimpleWorktreePanel(QFrame):
@@ -889,3 +892,4 @@ class BranchSelectionDialog(QDialog):
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
