@@ -16,21 +16,31 @@ logger = get_logger(__name__)
 
 def open_in_editor(path: Path):
     """Try to open path in VS Code (code), fall back to OS default."""
+    logger.info(f"Opening path in editor: {path}")
+    
     if which("code"):
+        logger.debug("Using VS Code (code) to open path")
         subprocess.Popen(["code", str(path)])
         return
+    
     # Other popular forks (best-effort)
     for editor in ("cursor", "windsurf", "codium"):
         if which(editor):
+            logger.debug(f"Using {editor} to open path")
             subprocess.Popen([editor, str(path)])
             return
+    
     # Fall back to OS handler
-    if sys.platform.startswith("win"):
-        os.startfile(str(path))  # type: ignore[attr-defined]
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(path)])
-    else:
-        subprocess.Popen(["xdg-open", str(path)])
+    logger.debug("Using OS default handler to open path")
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception as e:
+        logger.error(f"Failed to open path {path} with OS default handler: {e}", exc_info=True)
 
 
 def launch_claude_in_terminal(cwd: Path, claude_cmd: str = "claude"):
@@ -113,5 +123,6 @@ def launch_terminal_only(cwd: Path):
             return
     # If no terminal found, show error
     QMessageBox.critical(None, "Error", "No supported terminal emulator found.")
+
 
 
