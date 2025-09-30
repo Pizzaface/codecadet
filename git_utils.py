@@ -161,11 +161,26 @@ def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: 
 
 def remove_worktree(repo_root: Path, wt_path: Path, force=False):
     """Remove a worktree."""
-    args = ["-C", str(repo_root), "worktree", "remove"]
-    if force:
-        args.append("-f")
-    args.append(str(wt_path))
-    run_git(args)
+    start_time = time.time()
+    success = True
+    error_msg = None
+    
+    try:
+        args = ["-C", str(repo_root), "worktree", "remove"]
+        if force:
+            args.append("-f")
+        args.append(str(wt_path))
+        run_git(args)
+        logger.info(f"Successfully removed worktree at {wt_path}")
+    except Exception as e:
+        success = False
+        error_msg = str(e)
+        logger.error(f"Failed to remove worktree at {wt_path}: {e}")
+        raise
+    finally:
+        # Record worktree operation metrics
+        duration_ms = (time.time() - start_time) * 1000
+        record_worktree_operation("remove_worktree", success, duration_ms, error_msg)
 
 
 def prune_worktrees(repo_root: Path):
@@ -191,6 +206,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
