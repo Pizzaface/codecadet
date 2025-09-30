@@ -21,10 +21,13 @@ from terminal import open_in_editor, launch_claude_in_terminal
 from models import WorktreeInfo
 from clipboard import setup_entry_clipboard
 from .tooltip import add_tooltip, add_tooltip_to_button, StatusTooltip
+from logging_config import get_logger
 
 from .dialogs import CreateDialog
 from .sidebar import SimpleWorktreeSidebar
 from .terminal_pane import TerminalPane
+
+logger = get_logger(__name__)
 
 
 class App(QMainWindow):
@@ -897,3 +900,4 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
