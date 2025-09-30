@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Dict
 
 from models import SessionInfo
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SessionManager:
@@ -73,3 +76,4 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
