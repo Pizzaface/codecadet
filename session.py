@@ -6,6 +6,7 @@ from typing import Dict
 
 from models import SessionInfo
 from logging_config import get_logger
+from metrics import record_error
 
 logger = get_logger(__name__)
 
@@ -79,6 +80,7 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
 
