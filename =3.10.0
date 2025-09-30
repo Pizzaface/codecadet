@@ -1,0 +1,25 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting pytest
+  Downloading pytest-8.4.2-py3-none-any.whl.metadata (7.7 kB)
+Collecting pytest-qt
+  Downloading pytest_qt-4.5.0-py3-none-any.whl.metadata (7.9 kB)
+Collecting pytest-cov
+  Downloading pytest_cov-7.0.0-py3-none-any.whl.metadata (31 kB)
+Collecting pytest-mock
+  Downloading pytest_mock-3.15.1-py3-none-any.whl.metadata (3.9 kB)
+Collecting iniconfig>=1 (from pytest)
+  Downloading iniconfig-2.1.0-py3-none-any.whl.metadata (2.7 kB)
+Requirement already satisfied: packaging>=20 in /usr/local/lib/python3.13/site-packages (from pytest) (24.2)
+Requirement already satisfied: pluggy<2,>=1.5 in /usr/local/lib/python3.13/site-packages (from pytest) (1.6.0)
+Requirement already satisfied: pygments>=2.7.2 in /usr/local/lib/python3.13/site-packages (from pytest) (2.19.1)
+Requirement already satisfied: typing_extensions in /usr/local/lib/python3.13/site-packages (from pytest-qt) (4.13.2)
+Collecting coverage>=7.10.6 (from coverage[toml]>=7.10.6->pytest-cov)
+  Downloading coverage-7.10.7-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (8.9 kB)
+Downloading pytest-8.4.2-py3-none-any.whl (365 kB)
+Downloading pytest_qt-4.5.0-py3-none-any.whl (37 kB)
+Downloading pytest_cov-7.0.0-py3-none-any.whl (22 kB)
+Downloading pytest_mock-3.15.1-py3-none-any.whl (10 kB)
+Downloading coverage-7.10.7-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (252 kB)
+Downloading iniconfig-2.1.0-py3-none-any.whl (6.0 kB)
+Installing collected packages: iniconfig, coverage, pytest, pytest-qt, pytest-mock, pytest-cov
+Successfully installed coverage-7.10.7 iniconfig-2.1.0 pytest-8.4.2 pytest-cov-7.0.0 pytest-mock-3.15.1 pytest-qt-4.5.0
