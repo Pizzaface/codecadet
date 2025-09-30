@@ -8,8 +8,8 @@ import pytest
 
 from git_utils import (
     which, run_git, ensure_repo_root, git_version_ok,
-    list_worktrees, create_worktree, remove_worktree,
-    get_current_branch, get_branches, get_recent_branches
+    list_worktrees, add_worktree, remove_worktree,
+    list_branches
 )
 from models import WorktreeInfo
 
@@ -408,3 +408,4 @@ class TestBranchOperations:
             "--count=10",
             "refs/heads/"
         ])
+
