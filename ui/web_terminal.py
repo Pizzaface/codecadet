@@ -15,6 +15,9 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtMultimedia import QSoundEffect
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 INACTIVITY_TIMER = 3
 
@@ -305,3 +308,4 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
