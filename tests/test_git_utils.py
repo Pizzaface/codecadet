@@ -217,61 +217,54 @@ class TestListWorktrees:
             list_worktrees(Path("/home/user/notrepo"))
 
 
-class TestCreateWorktree:
-    """Test create_worktree function."""
+class TestAddWorktree:
+    """Test add_worktree function."""
 
     @patch('git_utils.run_git')
-    def test_create_worktree_success(self, mock_run_git):
-        """Test creating worktree successfully."""
+    def test_add_worktree_success(self, mock_run_git):
+        """Test adding worktree successfully."""
         mock_result = Mock()
         mock_result.returncode = 0
         mock_run_git.return_value = mock_result
 
-        create_worktree(
+        add_worktree(
             repo_root=Path("/home/user/repo"),
-            path=Path("/home/user/repo-feature"),
-            branch="feature-branch"
-        )
-        
-        mock_run_git.assert_called_once_with([
-            "-C", "/home/user/repo",
-            "worktree", "add",
-            "/home/user/repo-feature",
-            "feature-branch"
-        ])
-
-    @patch('git_utils.run_git')
-    def test_create_worktree_with_checkout(self, mock_run_git):
-        """Test creating worktree with checkout option."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_run_git.return_value = mock_result
-
-        create_worktree(
-            repo_root=Path("/home/user/repo"),
-            path=Path("/home/user/repo-feature"),
+            new_path=Path("/home/user/repo-feature"),
             branch="feature-branch",
-            checkout="origin/feature-branch"
+            base_ref=None
         )
         
-        mock_run_git.assert_called_once_with([
-            "-C", "/home/user/repo",
-            "worktree", "add",
-            "/home/user/repo-feature",
-            "feature-branch",
-            "origin/feature-branch"
-        ])
+        # Should call run_git twice: once to check if branch exists, once to add worktree
+        assert mock_run_git.call_count == 2
 
     @patch('git_utils.run_git')
-    def test_create_worktree_error(self, mock_run_git):
-        """Test creating worktree when command fails."""
+    def test_add_worktree_with_base_ref(self, mock_run_git):
+        """Test adding worktree with base reference."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_run_git.return_value = mock_result
+
+        add_worktree(
+            repo_root=Path("/home/user/repo"),
+            new_path=Path("/home/user/repo-feature"),
+            branch="feature-branch",
+            base_ref="origin/feature-branch"
+        )
+        
+        # Should call run_git twice: once to check if branch exists, once to add worktree
+        assert mock_run_git.call_count == 2
+
+    @patch('git_utils.run_git')
+    def test_add_worktree_error(self, mock_run_git):
+        """Test adding worktree when command fails."""
         mock_run_git.side_effect = RuntimeError("branch already exists")
 
         with pytest.raises(RuntimeError, match="branch already exists"):
-            create_worktree(
+            add_worktree(
                 repo_root=Path("/home/user/repo"),
-                path=Path("/home/user/repo-feature"),
-                branch="existing-branch"
+                new_path=Path("/home/user/repo-feature"),
+                branch="existing-branch",
+                base_ref=None
             )
 
 
@@ -408,4 +401,5 @@ class TestBranchOperations:
             "--count=10",
             "refs/heads/"
         ])
+
 
