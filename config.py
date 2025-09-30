@@ -55,13 +55,21 @@ def load_config() -> dict:
     try:
         with p.open("r", encoding="utf-8") as f:
             cfg = json.load(f)
+        logger.debug(f"Configuration loaded from {p}")
         # Migrate legacy configuration
         migrate_legacy_config(cfg)
         # Fill any missing keys with defaults
         for k, v in DEFAULT_CONFIG.items():
             cfg.setdefault(k, v)
         return cfg
-    except Exception:
+    except FileNotFoundError:
+        logger.info(f"Configuration file not found at {p}, using defaults")
+        return DEFAULT_CONFIG.copy()
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in configuration file {p}: {e}")
+        return DEFAULT_CONFIG.copy()
+    except Exception as e:
+        logger.error(f"Error loading configuration from {p}: {e}", exc_info=True)
         return DEFAULT_CONFIG.copy()
 
 
@@ -184,4 +192,5 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
