@@ -185,7 +185,22 @@ def remove_worktree(repo_root: Path, wt_path: Path, force=False):
 
 def prune_worktrees(repo_root: Path):
     """Prune stale worktrees."""
-    run_git(["-C", str(repo_root), "worktree", "prune", "-v"])
+    start_time = time.time()
+    success = True
+    error_msg = None
+    
+    try:
+        run_git(["-C", str(repo_root), "worktree", "prune", "-v"])
+        logger.info(f"Successfully pruned worktrees in {repo_root}")
+    except Exception as e:
+        success = False
+        error_msg = str(e)
+        logger.error(f"Failed to prune worktrees in {repo_root}: {e}")
+        raise
+    finally:
+        # Record worktree operation metrics
+        duration_ms = (time.time() - start_time) * 1000
+        record_worktree_operation("prune_worktrees", success, duration_ms, error_msg)
 
 
 def checkout_branch(worktree_path: Path, branch: str):
@@ -206,6 +221,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
