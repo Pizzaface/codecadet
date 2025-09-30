@@ -248,8 +248,8 @@ class App(QMainWindow):
             selected = self.sidebar.get_selected_worktree()
             if not selected or selected != path:
                 self.sidebar.set_attention_for_path(path, True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to set attention indicator for path {path}: {e}")
 
     def notify_activity(self, path: Path):
         """Called when a session shows activity; clears the sidebar indicator."""
@@ -900,5 +900,6 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
