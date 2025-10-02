@@ -10,9 +10,10 @@ import termios
 import re
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal, QThread
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QUrl
 from PySide6.QtGui import QFont, QTextCursor, QKeyEvent, QTextCharFormat, QColor, QFontDatabase, QFontMetrics
 from PySide6.QtWidgets import QTextEdit
+from PySide6.QtMultimedia import QSoundEffect
 
 
 class ANSIColorParser:
@@ -205,6 +206,8 @@ class PTYReader(QThread):
 class PTYTerminalWidget(QTextEdit):
     """A simple terminal emulator widget using PTY."""
     
+    bell_triggered = Signal()  # Signal when terminal bell is triggered
+    
     def __init__(self, parent, command, cwd):
         super().__init__(parent)
         
@@ -213,6 +216,13 @@ class PTYTerminalWidget(QTextEdit):
         
         # Buffer for handling partial ANSI sequences
         self.data_buffer = ""
+        
+        # Setup sound effect for bell functionality
+        self.sound_effect = QSoundEffect()
+        self._load_notification_sound()
+        
+        # Connect bell signal to sound handler
+        self.bell_triggered.connect(self._on_bell_triggered)
         
         # Setup appearance - white text on black for better visibility
         self.setStyleSheet("""
@@ -332,6 +342,17 @@ class PTYTerminalWidget(QTextEdit):
         """Process buffered data, handling partial ANSI sequences."""
         # Check for complete ANSI escape sequences and special commands
         text = self.data_buffer
+        
+        # Handle bell character detection before processing ANSI sequences
+        if '\x07' in text:
+            # Check if bell is enabled in configuration
+            from config import load_config
+            config = load_config()
+            if config.get("terminal_bell_enabled", True):
+                # Emit signal to play the sound effect
+                self.bell_triggered.emit()
+            # Filter out the bell character from the display text
+            text = text.replace('\x07', '')
         
         # Handle clear screen
         if '\x1b[2J' in text or '\x1b[3J' in text:
@@ -489,6 +510,26 @@ class PTYTerminalWidget(QTextEdit):
                 except:
                     pass
     
+    def _load_notification_sound(self):
+        """Load the notification sound file."""
+        # Look for sound file in assets directory
+        sound_path = Path(__file__).parent.parent / "assets" / "done.wav"
+        if sound_path.exists():
+            self.sound_effect.setSource(QUrl.fromLocalFile(str(sound_path)))
+            self.sound_effect.setVolume(0.5)
+        else:
+            pass  # Notification sound not found
+    
+    def _on_bell_triggered(self):
+        """Handle terminal bell event - play sound effect."""
+        # Check if bell is enabled in configuration
+        from config import load_config
+        config = load_config()
+        if config.get("terminal_bell_enabled", True):
+            # Play the existing sound effect (done.wav)
+            if self.sound_effect and self.sound_effect.source():
+                self.sound_effect.play()
+    
     def closeEvent(self, event):
         """Clean up when closing."""
         self._cleanup()
@@ -512,3 +553,8 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
+
+
+
+

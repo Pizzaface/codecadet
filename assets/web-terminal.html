@@ -71,7 +71,10 @@
             convertEol: false,  // Disable to fix animation newline issues
             scrollOnUserInput: false,  // Don't auto-scroll
             disableStdin: false,
-            allowProposedApi: true
+            allowProposedApi: true,
+            // Bell configuration
+            bellSound: null,  // Disable default bell sound (we'll handle it in Qt)
+            bellStyle: 'sound'  // Enable bell detection
         });
 
         // Add addons
@@ -101,6 +104,15 @@
         new QWebChannel(qt.webChannelTransport, function (channel) {
             qtBridge = channel.objects.qtBridge;
             console.log('Qt WebChannel connected');
+            
+            // Set up bell event handler
+            terminal.onBell(function() {
+                if (qtBridge && qtBridge.handle_bell_event) {
+                    qtBridge.handle_bell_event();
+                } else {
+                    if (DEBUG) console.log('Qt bridge not ready for bell event');
+                }
+            });
         });
 
         // Handle input from terminal
@@ -237,3 +249,5 @@
     </script>
 </body>
 </html>
+
+
