@@ -130,7 +130,7 @@ def prune_worktrees(repo_root: Path):
     run_git(["-C", str(repo_root), "worktree", "prune", "-v"])
 
 
-def checkout_branch(worktree_path: Path, branch: str):
+def checkout_branch(worktree_path: Path, branch: str) -> None:
     """Switch to a different branch in the given worktree."""
     run_git(["-C", str(worktree_path), "checkout", branch])
 
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
