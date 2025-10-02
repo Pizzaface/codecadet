@@ -67,7 +67,7 @@ class SessionManager:
         """Get all sessions (active and inactive)."""
         return self.sessions.copy()
 
-    def cleanup_terminated_sessions(self):
+    def cleanup_terminated_sessions(self) -> None:
         """Clean up sessions with terminated processes."""
         to_remove = []
         for path_str, session in self.sessions.items():
@@ -76,6 +76,7 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
 
