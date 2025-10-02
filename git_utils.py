@@ -14,7 +14,7 @@ def which(cmd: str) -> str | None:
     return shutil.which(cmd)
 
 
-def run_git(args, cwd=None, check=True):
+def run_git(args: List[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
     """Run a git command with safe argument passing."""
     cmd = ["git"] + list(args)
     try:
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
