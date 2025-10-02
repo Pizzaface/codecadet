@@ -50,7 +50,8 @@ def git_version_ok(min_major=2, min_minor=5) -> bool:
             major = int(nums[0])
             minor = int(nums[1])
             return (major > min_major) or (major == min_major and minor >= min_minor)
-    except Exception:
+    except (ValueError, IndexError, AttributeError) as e:
+        logging.warning(f"Failed to parse git version: {e}")
         pass
     return False
 
@@ -146,4 +147,5 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
