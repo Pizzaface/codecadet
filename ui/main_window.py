@@ -247,7 +247,8 @@ class App(QMainWindow):
             selected = self.sidebar.get_selected_worktree()
             if not selected or selected != path:
                 self.sidebar.set_attention_for_path(path, True)
-        except Exception:
+        except (AttributeError, RuntimeError) as e:
+            logging.warning(f"Failed to handle inactivity notification for {path}: {e}")
             pass
 
     def notify_activity(self, path: Path):
@@ -899,5 +900,6 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
