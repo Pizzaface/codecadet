@@ -137,7 +137,7 @@ def set_agent_config(cfg: dict, agent_id: str, name: str, command: str, enabled:
     }
 
 
-def remove_agent_config(cfg: dict, agent_id: str):
+def remove_agent_config(cfg: dict, agent_id: str) -> None:
     """Remove a coding agent configuration."""
     agents = cfg.get("coding_agents", {})
     if agent_id in agents:
@@ -183,6 +183,7 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
 
