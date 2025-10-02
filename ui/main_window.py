@@ -230,7 +230,8 @@ class App(QMainWindow):
                 if (now - self._last_sound_time) >= 4.0:
                     self._notif_sound.play()
                     self._last_sound_time = now
-        except Exception:
+        except (AttributeError, RuntimeError) as e:
+            logging.debug(f"Failed to play notification sound: {e}")
             pass
 
     def notify_inactivity(self, path: Path):
@@ -898,4 +899,5 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
