@@ -4,6 +4,12 @@ import subprocess
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import sys
+
+# Mock PySide6 to avoid GUI dependencies in headless environment
+sys.modules['PySide6'] = MagicMock()
+sys.modules['PySide6.QtWidgets'] = MagicMock()
+sys.modules['PySide6.QtCore'] = MagicMock()
 
 from git_utils import (
     run_git,
@@ -308,3 +314,4 @@ class TestIntegration:
         # Verify cleanup
         result = run_git(["worktree", "list"], cwd=repo_root)
         assert str(worktree_path) not in result.stdout
+
