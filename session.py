@@ -58,7 +58,8 @@ class SessionManager:
             if session.container_frame:
                 try:
                     session.container_frame.destroy()
-                except Exception:
+                except (AttributeError, RuntimeError) as e:
+                    logging.warning(f"Failed to destroy container frame for {path_str}: {e}")
                     pass
             del self.sessions[path_str]
 
@@ -75,5 +76,6 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
