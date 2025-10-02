@@ -183,6 +183,11 @@ class TerminalBridge(QObject):
             except OSError:
                 pass
     
+    @Slot()
+    def handle_bell_event(self):
+        """Handle terminal bell event from JavaScript."""
+        self.bell_triggered.emit()
+    
     def cleanup(self):
         """Clean up PTY resources."""
         self.running = False
@@ -306,4 +311,5 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
