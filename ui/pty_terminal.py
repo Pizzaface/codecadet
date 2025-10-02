@@ -335,6 +335,17 @@ class PTYTerminalWidget(QTextEdit):
         # Check for complete ANSI escape sequences and special commands
         text = self.data_buffer
         
+        # Handle bell character detection before processing ANSI sequences
+        if '\x07' in text:
+            # Check if bell is enabled in configuration
+            from config import load_config
+            config = load_config()
+            if config.get("terminal_bell_enabled", True):
+                # Emit signal to play the sound effect
+                self.bell_triggered.emit()
+            # Filter out the bell character from the display text
+            text = text.replace('\x07', '')
+        
         # Handle clear screen
         if '\x1b[2J' in text or '\x1b[3J' in text:
             self.clear()
@@ -514,4 +525,5 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
 
