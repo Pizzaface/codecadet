@@ -1,0 +1,85 @@
+# Pre-commit configuration for Git Worktree Manager
+# Run `pre-commit install` to set up the git hook scripts
+# Run `pre-commit run --all-files` to run all hooks on all files
+
+repos:
+  # Pre-commit hooks for basic file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: Trim trailing whitespace
+      - id: end-of-file-fixer
+        description: Ensure files end with a newline
+      - id: check-yaml
+        description: Check YAML files for syntax errors
+      - id: check-toml
+        description: Check TOML files for syntax errors
+      - id: check-json
+        description: Check JSON files for syntax errors
+      - id: check-merge-conflict
+        description: Check for merge conflict markers
+      - id: check-added-large-files
+        description: Prevent giant files from being committed
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+        description: Check for files with case conflicts
+      - id: mixed-line-ending
+        description: Check for mixed line endings
+        args: ['--fix=lf']
+
+  # Ruff for linting and formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        name: ruff-lint
+        description: Run Ruff linter
+        args: [--fix, --exit-non-zero-on-fix]
+        types: [python]
+      - id: ruff-format
+        name: ruff-format
+        description: Run Ruff formatter
+        types: [python]
+
+  # MyPy for type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.1
+    hooks:
+      - id: mypy
+        name: mypy-type-check
+        description: Run MyPy type checker
+        additional_dependencies:
+          - types-setuptools
+        args: [--strict, --ignore-missing-imports]
+        types: [python]
+        exclude: ^(tests/|ui/web_terminal\.py|ui/pty_terminal\.py)$
+
+  # Additional Python-specific checks
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: bandit-security-check
+        description: Run Bandit security linter
+        args: [-r, ., -f, json, -o, bandit-report.json]
+        types: [python]
+        exclude: ^tests/
+
+# Configuration for pre-commit
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: "3.5.0"
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
