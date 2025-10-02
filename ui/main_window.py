@@ -1,42 +1,64 @@
 """Main window and application logic."""
 
 import logging
-import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings, QUrl
-from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon
-from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QComboBox, QPushButton, QCheckBox, QSplitter,
-    QStatusBar, QMenuBar, QMenu, QMessageBox, QFileDialog,
-    QInputDialog, QApplication, QDialog
-)
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
 
-from config import load_config, save_config, push_recent_repo, get_agent_command, get_default_agent, get_coding_agents
-from git_utils import git_version_ok, ensure_repo_root, list_worktrees, list_branches
-from git_utils import add_worktree, remove_worktree, prune_worktrees
-from session import SessionManager
-from terminal import open_in_editor, launch_claude_in_terminal
-from models import WorktreeInfo
 from clipboard import setup_entry_clipboard
-from .tooltip import add_tooltip, add_tooltip_to_button, StatusTooltip
+from config import (
+    get_agent_command,
+    get_coding_agents,
+    get_default_agent,
+    load_config,
+    push_recent_repo,
+    save_config,
+)
+from git_utils import (
+    add_worktree,
+    ensure_repo_root,
+    git_version_ok,
+    list_branches,
+    list_worktrees,
+    prune_worktrees,
+    remove_worktree,
+)
+from models import WorktreeInfo
+from session import SessionManager
+from terminal import launch_claude_in_terminal, open_in_editor
 
 from .dialogs import CreateDialog
 from .sidebar import SimpleWorktreeSidebar
 from .terminal_pane import TerminalPane
+from .tooltip import StatusTooltip, add_tooltip, add_tooltip_to_button
 
 
 class App(QMainWindow):
     """Main application window."""
-    
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Git Worktree Manager for Claude Code")
         self.resize(1000, 600)
         self.setMinimumSize(880, 520)
-        
+
         # Set window icon
         icon_path = Path(__file__).parent.parent / "assets" / "icon.png"
         if icon_path.exists():
@@ -58,7 +80,7 @@ class App(QMainWindow):
         self._setup_menus()
         self._setup_shortcuts()
         self._populate_agent_combo()
-        
+
         # Notification sound (shared across app)
         self._notif_sound = QSoundEffect()
         self._last_sound_time = 0.0
@@ -66,7 +88,7 @@ class App(QMainWindow):
         if sound_path.exists():
             self._notif_sound.setSource(QUrl.fromLocalFile(str(sound_path)))
             self._notif_sound.setVolume(0.5)
-        
+
         # Initial Git check
         if not git_version_ok():
             QMessageBox.warning(
@@ -77,63 +99,63 @@ class App(QMainWindow):
 
         # Restore window geometry and last repo
         self._restore_settings()
-        
+
     def _setup_ui(self):
         """Setup the main UI."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(12, 12, 12, 12)
         main_layout.setSpacing(6)
-        
+
         # Top bar
         top_layout = QHBoxLayout()
         top_layout.setSpacing(6)
-        
+
         repo_label = QLabel("Repository:")
         top_layout.addWidget(repo_label)
-        
+
         self.repo_combo = QComboBox()
         self.repo_combo.setEditable(True)
         self.repo_combo.setMinimumWidth(400)
         self.repo_combo.addItems(self.cfg.get("recent_repos", []))
         self.repo_combo.currentTextChanged.connect(self._on_repo_combo_changed)
         top_layout.addWidget(self.repo_combo, 1)  # stretch factor 1
-        
+
         # Setup clipboard functionality for repository entry
         setup_entry_clipboard(self.repo_combo.lineEdit())
         add_tooltip(self.repo_combo,
                    "Enter or select a Git repository path.\n"
                    "Recent repositories are shown in dropdown.\n"
                    "Supports clipboard paste (Ctrl+V).")
-        
+
         pick_btn = QPushButton("Pick…")
         pick_btn.clicked.connect(self.choose_repo)
         top_layout.addWidget(pick_btn)
         add_tooltip_to_button(pick_btn, "Browse for a Git repository folder")
-        
+
         open_btn = QPushButton("Open")
         open_btn.clicked.connect(self.open_repo_from_entry)
         top_layout.addWidget(open_btn)
         add_tooltip_to_button(open_btn, "Open the repository entered above")
-        
+
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.refresh)
         top_layout.addWidget(refresh_btn)
         add_tooltip_to_button(refresh_btn, "Refresh worktree list and status (F5)")
-        
+
         self.auto_reopen_cb = QCheckBox("Auto‑reopen last")
         self.auto_reopen_cb.setChecked(bool(self.cfg.get("auto_reopen_last", True)))
         self.auto_reopen_cb.toggled.connect(self._persist_auto_reopen)
         top_layout.addWidget(self.auto_reopen_cb)
         add_tooltip(self.auto_reopen_cb, "Automatically reopen the last used repository when starting the application")
-        
+
         main_layout.addLayout(top_layout)
-        
+
         # Splitter (sidebar + terminal)
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        
+
         # Left: Simple worktree sidebar
         self.sidebar = SimpleWorktreeSidebar(
             splitter,
@@ -143,7 +165,7 @@ class App(QMainWindow):
         )
         self.sidebar.set_config(self.cfg)  # Pass config for recent branches tracking
         splitter.addWidget(self.sidebar)
-        
+
         # Right: terminal pane
         self.term = TerminalPane(
             splitter,
@@ -152,75 +174,75 @@ class App(QMainWindow):
             config_getter=lambda: self.cfg
         )
         splitter.addWidget(self.term)
-        
+
         # Set the session manager for the terminal pane
         self.term.set_session_manager(self.session_manager)
-        
+
         # Update terminal button text with default agent
         self.term.update_run_button_text()
-        
+
         # Set splitter proportions
         splitter.setSizes([400, 600])
         main_layout.addWidget(splitter, 1)  # stretch factor 1
-        
+
         # Bottom action bar
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(6)
-        
+
         create_btn = QPushButton("Create worktree")
         create_btn.clicked.connect(self.create_worktree)
         bottom_layout.addWidget(create_btn)
         add_tooltip_to_button(create_btn, "Create a new Git worktree (Ctrl+N)")
-        
+
         remove_btn = QPushButton("Remove worktree")
         remove_btn.clicked.connect(self.remove_selected)
         bottom_layout.addWidget(remove_btn)
         add_tooltip_to_button(remove_btn, "Remove the selected worktree\n(Cannot remove the main worktree)")
-        
+
         prune_btn = QPushButton("Prune stale")
         prune_btn.clicked.connect(self.prune)
         bottom_layout.addWidget(prune_btn)
         add_tooltip_to_button(prune_btn, "Clean up metadata for deleted worktrees")
-        
+
         bottom_layout.addSpacing(20)  # Visual separator
-        
+
         editor_btn = QPushButton("Open in editor")
         editor_btn.clicked.connect(self.open_editor)
         bottom_layout.addWidget(editor_btn)
         add_tooltip_to_button(editor_btn, "Open the selected worktree in your default code editor")
-        
+
         # Agent selector and Run button
         agent_layout = QHBoxLayout()
-        
+
         self.agent_combo = QComboBox()
         self.agent_combo.setMinimumWidth(120)
         self.agent_combo.currentIndexChanged.connect(self._on_agent_selection_changed)
         agent_layout.addWidget(self.agent_combo)
         add_tooltip(self.agent_combo, "Select the coding agent to run")
-        
+
         claude_btn = QPushButton("Run")
         claude_btn.clicked.connect(self.launch_claude)
         agent_layout.addWidget(claude_btn)
         add_tooltip_to_button(claude_btn, "Launch the selected coding agent in the selected worktree")
-        
+
         bottom_layout.addLayout(agent_layout)
-        
+
         bottom_layout.addStretch()
         main_layout.addLayout(bottom_layout)
-        
+
         # Status bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        
+
         status_label = QLabel("Ready")
         status_label.setStyleSheet("color: #9aa1b2; padding: 6px 12px;")
         self.status_bar.addWidget(status_label)
         self.status_label = status_label
-        
+
         # Status tooltip for additional information
         self.status_tooltip = StatusTooltip(status_label)
-        
-        
+
+
     def _play_notification_sound(self):
         try:
             if self._notif_sound and self._notif_sound.source():
@@ -258,73 +280,73 @@ class App(QMainWindow):
         except (AttributeError, RuntimeError) as e:
             logging.warning(f"Failed to clear activity notification for {path}: {e}")
             pass
-    
+
     def _setup_menus(self):
         """Setup the menu bar."""
         menubar = self.menuBar()
-        
+
         # File menu
         file_menu = menubar.addMenu("File")
-        
+
         open_action = QAction("Open repository…", self)
         open_action.setShortcut(QKeySequence("Ctrl+O"))
         open_action.triggered.connect(self.choose_repo)
         file_menu.addAction(open_action)
-        
+
         file_menu.addSeparator()
-        
+
         # Recent Repositories submenu
         self.recent_menu = file_menu.addMenu("Recent Repositories")
         self._rebuild_recent_menu()
-        
+
         file_menu.addSeparator()
-        
+
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
-        
+
         # View menu
         view_menu = menubar.addMenu("View")
-        
+
         refresh_action = QAction("Refresh", self)
         refresh_action.setShortcut(QKeySequence("F5"))
         refresh_action.triggered.connect(self.refresh)
         view_menu.addAction(refresh_action)
-        
+
         view_menu.addSeparator()
-        
+
         dark_action = QAction("Dark theme", self)
         dark_action.triggered.connect(lambda: self._switch_theme("dark"))
         view_menu.addAction(dark_action)
-        
+
         light_action = QAction("Light theme", self)
         light_action.triggered.connect(lambda: self._switch_theme("light"))
         view_menu.addAction(light_action)
-        
+
         # Preferences menu
         pref_menu = menubar.addMenu("Preferences")
-        
+
         preferences_action = QAction("Preferences…", self)
         preferences_action.triggered.connect(self._open_preferences)
         pref_menu.addAction(preferences_action)
-        
+
         # Help menu
         help_menu = menubar.addMenu("Help")
-        
+
         about_action = QAction("About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
-    
+
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
         # These are in addition to menu shortcuts
         create_shortcut = QKeySequence("Ctrl+N")
         refresh_shortcut = QKeySequence("Ctrl+R")
-        
+
         # Note: Menu actions already have their shortcuts, these are additional
         self.create_worktree  # Will be triggered by menu action
         self.refresh  # Will be triggered by menu action
-    
+
     def _rebuild_recent_menu(self):
         """Rebuild the recent repositories menu."""
         self.recent_menu.clear()
@@ -334,17 +356,17 @@ class App(QMainWindow):
             empty_action.setEnabled(False)
             self.recent_menu.addAction(empty_action)
             return
-        
+
         for path in recents:
             action = QAction(path, self)
             action.triggered.connect(lambda checked, p=path: self._open_repo_by_path(p))
             self.recent_menu.addAction(action)
-        
+
         self.recent_menu.addSeparator()
         clear_action = QAction("Clear history", self)
         clear_action.triggered.connect(self._clear_recents)
         self.recent_menu.addAction(clear_action)
-    
+
     def _apply_theme(self, mode: str = "dark"):
         """Apply theme styling."""
         if mode == "dark":
@@ -357,7 +379,7 @@ class App(QMainWindow):
             accent = "#7c7fff"
             sel_bg = "#26304a"
             hover = "#20273a"
-            
+
             style = f"""
                 QMainWindow {{
                     background-color: {bg};
@@ -474,7 +496,7 @@ class App(QMainWindow):
             accent = "#4f46e5"
             sel_bg = "#e5e7f9"
             hover = "#eceffe"
-            
+
             style = f"""
                 QMainWindow {{
                     background-color: {bg};
@@ -582,15 +604,15 @@ class App(QMainWindow):
                     background-color: {accent};
                 }}
             """
-        
+
         self.setStyleSheet(style)
         self.cfg["theme"] = mode
         save_config(self.cfg)
-    
+
     def _switch_theme(self, mode: str):
         """Switch to specified theme."""
         self._apply_theme(mode)
-    
+
     def _show_about(self):
         """Show about dialog."""
         QMessageBox.about(
@@ -603,7 +625,7 @@ class App(QMainWindow):
             "• Embedded terminal via xterm on Linux\n"
             "Built with PySide6 for cross-platform compatibility."
         )
-    
+
     def _restore_settings(self):
         """Restore window geometry and last repo."""
         geom = self.cfg.get("window_geometry")
@@ -619,7 +641,7 @@ class App(QMainWindow):
             except (ValueError, IndexError) as e:
                 logging.warning(f"Failed to restore window geometry '{geom}': {e}")
                 pass
-        
+
         if self.cfg.get("auto_reopen_last") and self.cfg.get("last_repo"):
             last = Path(self.cfg["last_repo"])
             if last.exists():
@@ -627,12 +649,12 @@ class App(QMainWindow):
                 self.repo_combo.setCurrentText(str(self.repo_root))
                 self._on_repo_opened(self.repo_root)
                 self.refresh()
-    
+
     def _on_repo_combo_changed(self, text):
         """Handle repository combo box text changes."""
         # This is called when user types or selects from dropdown
         pass
-    
+
     def choose_repo(self):
         """Choose repository using file dialog."""
         folder = QFileDialog.getExistingDirectory(self, "Choose a Git repository")
@@ -754,7 +776,7 @@ class App(QMainWindow):
         if wt.resolve() == repo.resolve():
             QMessageBox.critical(self, "Cannot remove main worktree", "You cannot remove the main worktree.")
             return
-        
+
         reply = QMessageBox.question(
             self,
             "Confirm remove",
@@ -762,12 +784,12 @@ class App(QMainWindow):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
-        
+
         if reply == QMessageBox.StandardButton.Yes:
             use_force = True
         else:
             return
-            
+
         try:
             # Remove any active session for this worktree
             self.session_manager.remove_session(wt)
@@ -804,15 +826,15 @@ class App(QMainWindow):
         wt = self.selected_worktree()
         if not wt:
             return
-        
+
         # Get selected agent
         selected_agent = self.agent_combo.currentData()
         if not selected_agent:
             selected_agent = get_default_agent(self.cfg)
-        
+
         # Get the command for the selected agent
         agent_command = get_agent_command(self.cfg, selected_agent)
-        
+
         # If user prefers embedding and platform supports it, use the right pane
         if self.cfg.get("embed_terminal", True) and self.term.can_embed:
             self.term.run_claude_here(agent_command)
@@ -841,21 +863,21 @@ class App(QMainWindow):
         save_config(self.cfg)
         self.repo_combo.clear()
         self._rebuild_recent_menu()
-    
+
     def _populate_agent_combo(self):
         """Populate the agent selector combo box."""
         current_selection = self.agent_combo.currentData()
         self.agent_combo.clear()
-        
+
         agents = get_coding_agents(self.cfg)
         default_agent = get_default_agent(self.cfg)
-        
+
         # Add enabled agents
         for agent_id, agent_config in agents.items():
             if agent_config.get("enabled", True):
                 name = agent_config.get("name", agent_id)
                 self.agent_combo.addItem(name, agent_id)
-        
+
         # Set default selection
         if current_selection:
             # Try to restore previous selection
@@ -863,13 +885,13 @@ class App(QMainWindow):
                 if self.agent_combo.itemData(i) == current_selection:
                     self.agent_combo.setCurrentIndex(i)
                     return
-        
+
         # Fall back to default agent
         for i in range(self.agent_combo.count()):
             if self.agent_combo.itemData(i) == default_agent:
                 self.agent_combo.setCurrentIndex(i)
                 return
-    
+
     def _on_agent_selection_changed(self, index):
         """Handle agent selection change."""
         if index >= 0:
@@ -897,14 +919,14 @@ class App(QMainWindow):
         except (OSError, PermissionError) as e:
             logging.error(f"Failed to save configuration on close: {e}")
             pass
-        
+
         # Clean up all terminal sessions
         try:
             self.term.cleanup_all_sessions()
         except (AttributeError, RuntimeError) as e:
             logging.warning(f"Failed to cleanup terminal sessions on close: {e}")
             pass
-        
+
         event.accept()
 
 

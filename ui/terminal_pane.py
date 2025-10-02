@@ -2,15 +2,20 @@
 
 import logging
 import os
-import sys
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QFrame, QMessageBox
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 from git_utils import which
@@ -52,32 +57,32 @@ class TerminalPane(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
-        
+
         # Top bar
         bar_layout = QHBoxLayout()
-        
+
         title_label = QLabel("Terminal")
         bar_layout.addWidget(title_label)
-        
+
         bar_layout.addStretch()
-        
+
         self.status_lbl = QLabel("")
         self.status_lbl.setStyleSheet("color: #8b8e98;")
         bar_layout.addWidget(self.status_lbl)
-        
+
         layout.addLayout(bar_layout)
-        
+
         # Main container for terminal sessions
         self.main_container = QWidget()
         self.main_container_layout = QVBoxLayout(self.main_container)
         self.main_container_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.main_container, 1)  # stretch factor 1
-        
+
         # No session frame (shown when no session exists)
         self.no_session_frame = QFrame()
         no_session_layout = QVBoxLayout(self.no_session_frame)
         no_session_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         no_session_label = QLabel("No Session")
         no_session_label.setStyleSheet("""
             QLabel {
@@ -88,27 +93,27 @@ class TerminalPane(QWidget):
         """)
         no_session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         no_session_layout.addWidget(no_session_label)
-        
+
         # Control bar
         control_layout = QHBoxLayout()
-        
+
         self.run_claude_btn = QPushButton("▶ Run Claude here")
         self.run_claude_btn.clicked.connect(self.run_claude_here)
         control_layout.addWidget(self.run_claude_btn)
         self.update_run_button_text()
-        
+
         external_btn = QPushButton("□ Open External Terminal")
         external_btn.clicked.connect(self.open_external)
         control_layout.addWidget(external_btn)
-        
+
         control_layout.addStretch()
-        
+
         stop_btn = QPushButton("⛔ Stop")
         stop_btn.clicked.connect(self.stop_current)
         control_layout.addWidget(stop_btn)
-        
+
         layout.addLayout(control_layout)
-        
+
         self._update_embed_status()
         self._show_no_session()
 
@@ -145,11 +150,11 @@ class TerminalPane(QWidget):
     def set_session_manager(self, session_manager):
         """Set the session manager instance."""
         self.session_manager = session_manager
-    
+
     def update_run_button_text(self):
         """Update the run button text with the default agent name."""
         if self.get_config:
-            from config import get_default_agent, get_agent_config
+            from config import get_agent_config, get_default_agent
             config = self.get_config()
             default_agent = get_default_agent(config)
             agent_config = get_agent_config(config, default_agent)
@@ -251,7 +256,7 @@ class TerminalPane(QWidget):
 
         # Ensure the container is properly sized and visible
         container.updateGeometry()
-        
+
         # Get the native window ID for embedding
         wid = container.winId()
 
@@ -312,7 +317,7 @@ class TerminalPane(QWidget):
             'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
             'unset PATH_EXTRAS; '
         )
-        
+
         # Choose appropriate shell and profile based on platform
         if sys.platform == "darwin":
             shell_cmd = "zsh"
@@ -330,7 +335,7 @@ class TerminalPane(QWidget):
                 "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
                 "do [ -f \"$f\" ] && . \"$f\"; done"
             )
-        
+
         bash_command = (
             f'{path_cleanup_snippet}'
             f'{profile_source}; '  # Source user/system profiles for environment setup
@@ -359,7 +364,7 @@ class TerminalPane(QWidget):
             # Try web terminal first (better character handling)
             try:
                 from .web_terminal import WebTerminalWidget
-                
+
                 # Create web terminal widget
                 terminal_widget = WebTerminalWidget(container, bash_command, str(cwd))
                 # Hook inactivity signal to bubble up to the main app/sidebar
@@ -369,17 +374,17 @@ class TerminalPane(QWidget):
                 except (AttributeError, RuntimeError) as e:
                     logging.debug(f"Failed to connect terminal widget signals: {e}")
                     pass
-                
+
                 # Add to container layout
                 layout = QVBoxLayout(container)
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.addWidget(terminal_widget)
-                
+
                 # Create a mock process object for compatibility with session manager
                 class MockProcess:
                     def __init__(self, widget):
                         self.widget = widget
-                        
+
                     def poll(self):
                         # Check if process is still running via bridge
                         if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
@@ -389,11 +394,11 @@ class TerminalPane(QWidget):
                             except OSError:
                                 return 0  # Process ended
                         return 0
-                        
+
                     def terminate(self):
                         if hasattr(self.widget, 'cleanup'):
                             self.widget.cleanup()
-                
+
                 # Register this session with mock process
                 self.session_manager.register_session(
                     worktree_path=cwd,
@@ -401,27 +406,27 @@ class TerminalPane(QWidget):
                     container_frame=container,
                     command=claude_cmd
                 )
-                
+
                 self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
                 return
-                
+
             except ImportError:
                 # Fall back to original PTY terminal
                 from .pty_terminal import PTYTerminalWidget
-                
+
                 # Create PTY terminal widget
                 terminal_widget = PTYTerminalWidget(container, bash_command, str(cwd))
-                
+
                 # Add to container layout
                 layout = QVBoxLayout(container)
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.addWidget(terminal_widget)
-                
+
                 # Create a mock process object for compatibility with session manager
                 class MockProcess:
                     def __init__(self, widget):
                         self.widget = widget
-                        
+
                     def poll(self):
                         # Check if process is still running
                         if hasattr(self.widget, 'process_pid'):
@@ -431,11 +436,11 @@ class TerminalPane(QWidget):
                             except OSError:
                                 return 0  # Process ended
                         return 0
-                        
+
                     def terminate(self):
                         if hasattr(self.widget, '_cleanup'):
                             self.widget._cleanup()
-                
+
                 # Register this session with mock process
                 self.session_manager.register_session(
                     worktree_path=cwd,
@@ -443,9 +448,9 @@ class TerminalPane(QWidget):
                     container_frame=container,
                     command=claude_cmd
                 )
-                
+
                 self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
-            
+
         except ImportError as e:
             # Fallback to external terminal if no terminal widget available
             QMessageBox.information(self, "Terminal", f"Embedded terminal not available: {e}. Opening external terminal.")

@@ -4,7 +4,6 @@ import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Any
 
 from models import WorktreeInfo
 
@@ -14,7 +13,7 @@ def which(cmd: str) -> str | None:
     return shutil.which(cmd)
 
 
-def run_git(args: List[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run_git(args: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
     """Run a git command with safe argument passing."""
     cmd = ["git"] + list(args)
     try:

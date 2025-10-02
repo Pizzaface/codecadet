@@ -3,7 +3,6 @@
 import logging
 import time
 from pathlib import Path
-from typing import Dict
 
 from models import SessionInfo
 
@@ -12,9 +11,9 @@ class SessionManager:
     """Tracks terminal sessions for each worktree path."""
 
     def __init__(self):
-        self.sessions: Dict[str, SessionInfo] = {}  # {worktree_path_str: SessionInfo}
+        self.sessions: dict[str, SessionInfo] = {}  # {worktree_path_str: SessionInfo}
 
-    def register_session(self, worktree_path: Path, process: Any, 
+    def register_session(self, worktree_path: Path, process: Any,
                          container_frame: Any, command: str) -> None:
         """Register a new terminal session for a worktree."""
         path_str = str(worktree_path)
@@ -63,7 +62,7 @@ class SessionManager:
                     pass
             del self.sessions[path_str]
 
-    def get_all_sessions(self) -> Dict[str, SessionInfo]:
+    def get_all_sessions(self) -> dict[str, SessionInfo]:
         """Get all sessions (active and inactive)."""
         return self.sessions.copy()
 

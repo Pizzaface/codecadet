@@ -5,23 +5,39 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QFrame, QDialog, QLineEdit, QListWidget, QTextEdit,
-    QDialogButtonBox, QMessageBox, QListWidgetItem, QScrollArea
+    QDialog,
+    QDialogButtonBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
-from models import WorktreeInfo
+from config import get_recent_branches, push_recent_branch, save_config
 from git_utils import checkout_branch
-from config import push_recent_branch, get_recent_branches, save_config
-from graphite_utils import (is_graphite_repo, get_current_branch_info, GRAPHITE_COMMANDS,
-                           run_graphite_command, run_safe_graphite_command,
-                           suggest_conflict_resolution)
-from .tooltip import add_tooltip_to_button, add_tooltip
+from graphite_utils import (
+    GRAPHITE_COMMANDS,
+    is_graphite_repo,
+    run_graphite_command,
+    run_safe_graphite_command,
+    suggest_conflict_resolution,
+)
+from models import WorktreeInfo
+
+from .tooltip import add_tooltip_to_button
 
 
 class SimpleWorktreePanel(QFrame):
     """Simple worktree panel."""
-    
+
     # Custom signal for selection
     selected = Signal(object)  # WorktreeInfo
     branch_change_requested = Signal(object)  # SimpleWorktreePanel
@@ -38,7 +54,7 @@ class SimpleWorktreePanel(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(4)
-        
+
         # Name row with attention indicator
         name_row = QHBoxLayout()
         name_row.setContentsMargins(0, 0, 0, 0)
@@ -64,7 +80,7 @@ class SimpleWorktreePanel(QFrame):
         # Branch row with button
         branch_layout = QHBoxLayout()
         branch_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         branch_text = "detached" if not self.info.branch else self.info.branch.replace("refs/heads/", "")
         self.branch_label = QLabel(f"Branch: {branch_text}")
         self.branch_label.setFont(QFont("Arial", 10))
@@ -87,7 +103,7 @@ class SimpleWorktreePanel(QFrame):
         path_label = QLabel(path_text)
         path_label.setFont(QFont("Arial", 9))
         layout.addWidget(path_label)
-        
+
         # Make panel clickable
         self.mousePressEvent = self._on_click
 
@@ -164,7 +180,7 @@ class SimpleWorktreeSidebar(QWidget):
 
         self._setup_ui()
         self._apply_dark_theme()
-    
+
     def set_config(self, config):
         """Set the configuration object for recent branches tracking."""
         self.config = config
@@ -174,7 +190,7 @@ class SimpleWorktreeSidebar(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 10, 5, 10)
         layout.setSpacing(10)
-        
+
         # Header
         header = QLabel("Worktrees")
         header.setFont(QFont("Arial", 14, QFont.Weight.Bold))
@@ -186,19 +202,19 @@ class SimpleWorktreeSidebar(QWidget):
         self.graphite_layout = QVBoxLayout(self.graphite_frame)
         self.graphite_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.graphite_frame)
-        
+
         # Content area with scroll support
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
+
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(2)
         self.content_layout.addStretch()
-        
+
         scroll_area.setWidget(self.content_widget)
         layout.addWidget(scroll_area, 1)  # stretch factor 1
 
@@ -256,7 +272,7 @@ class SimpleWorktreeSidebar(QWidget):
             panel = SimpleWorktreePanel(self.content_widget, info)
             panel.selected.connect(self._on_panel_selected)
             panel.branch_change_requested.connect(self._on_branch_change)
-            
+
             # Insert before the stretch
             self.content_layout.insertWidget(self.content_layout.count() - 1, panel)
             self.panels.append(panel)
@@ -267,7 +283,7 @@ class SimpleWorktreeSidebar(QWidget):
             if panel.info.path == path:
                 panel.set_attention(on)
                 break
-    
+
     def _update_graphite_ui(self):
         """Update the Graphite commands UI section."""
         # Clear existing graphite widgets
@@ -282,7 +298,7 @@ class SimpleWorktreeSidebar(QWidget):
                 child_layout = child.layout()
                 if child_layout:
                     self._clear_layout(child_layout)
-    
+
     def _clear_layout(self, layout):
         """Recursively clear a layout."""
         while layout.count():
@@ -295,18 +311,18 @@ class SimpleWorktreeSidebar(QWidget):
                 child_layout = child.layout()
                 if child_layout:
                     self._clear_layout(child_layout)
-            
+
         if not self.is_graphite_repo:
             return
-        
+
         # Graphite header
         graphite_label = QLabel("📊 Graphite")
         graphite_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         graphite_label.setStyleSheet("color: #7c7fff;")
         self.graphite_layout.addWidget(graphite_label)
-        
+
         # Create buttons for common Graphite commands
-        
+
         # Row 1: Navigation with clearer labels
         nav_layout = QHBoxLayout()
         nav_commands = [
@@ -315,7 +331,7 @@ class SimpleWorktreeSidebar(QWidget):
             ("top", "Top", "Go to the top branch of the current stack"),
             ("bottom", "Base", "Go to the bottom/base branch of the current stack")
         ]
-        
+
         for cmd_key, label, tooltip in nav_commands:
             if cmd_key in GRAPHITE_COMMANDS:
                 cmd_info = GRAPHITE_COMMANDS[cmd_key]
@@ -338,9 +354,9 @@ class SimpleWorktreeSidebar(QWidget):
                 """)
                 nav_layout.addWidget(btn)
                 add_tooltip_to_button(btn, tooltip)
-        
+
         self.graphite_layout.addLayout(nav_layout)
-        
+
         # Row 2: Stack management with clearer labels
         stack_layout = QHBoxLayout()
         stack_commands = [
@@ -349,7 +365,7 @@ class SimpleWorktreeSidebar(QWidget):
             ("restack", "Rebase", "Rebase the entire stack to resolve conflicts (may cause conflicts)"),
             ("submit", "Submit", "Create/update pull requests for the current stack")
         ]
-        
+
         for cmd_key, label, tooltip in stack_commands:
             if cmd_key in GRAPHITE_COMMANDS:
                 cmd_info = GRAPHITE_COMMANDS[cmd_key]
@@ -372,42 +388,42 @@ class SimpleWorktreeSidebar(QWidget):
                 """)
                 stack_layout.addWidget(btn)
                 add_tooltip_to_button(btn, tooltip)
-        
+
         self.graphite_layout.addLayout(stack_layout)
-    
+
     def _run_graphite_command(self, command_key: str):
         """Run a Graphite command with conflict checking."""
         repo_root = self.get_repo_root()
         if not repo_root:
             QMessageBox.critical(self, "No Repository", "No repository selected.")
             return
-            
+
         if command_key not in GRAPHITE_COMMANDS:
             return
-            
+
         cmd_info = GRAPHITE_COMMANDS[command_key]
-        
+
         # For potentially unsafe commands, use conflict checking
         if not cmd_info.get("safe", True):
             self._run_safe_graphite_command(command_key, cmd_info)
         else:
             # For safe commands, run directly
             self._run_basic_graphite_command(command_key, cmd_info)
-    
+
     def _run_basic_graphite_command(self, command_key: str, cmd_info: dict):
         """Run a basic Graphite command without conflict checking."""
         repo_root = self.get_repo_root()
-        
+
         # Check if this command allows interactive mode
         allow_interactive = cmd_info.get("allow_interactive", False)
         success, output = run_graphite_command(repo_root, cmd_info["cmd"], allow_interactive)
-        
+
         if success:
             if command_key == "log":
                 self._show_stack_visualization(output)
             else:
                 QMessageBox.information(self, "Graphite", f"{cmd_info['desc']} completed successfully!\n\n{output}")
-            
+
             # Auto-refresh after commands that might change branches
             if command_key in ["up", "down", "top", "bottom", "checkout", "sync"]:
                 self._auto_refresh_after_branch_switch()
@@ -417,25 +433,25 @@ class SimpleWorktreeSidebar(QWidget):
                 QMessageBox.warning(self, "Multiple Top Branches", output)
             else:
                 QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
-    
+
     def _run_safe_graphite_command(self, command_key: str, cmd_info: dict):
         """Run a potentially unsafe Graphite command with conflict checking."""
         repo_root = self.get_repo_root()
-        
+
         # Get main app to access worktree info
         main_app = self._get_main_app()
         if not main_app or not hasattr(main_app, 'infos'):
             # Fallback to basic command if we can't get worktree info
             self._run_basic_graphite_command(command_key, cmd_info)
             return
-            
+
         # Show loading message for longer operations
         if command_key in ["sync", "restack", "submit"]:
             QMessageBox.information(self, "Graphite", f"Checking for conflicts before {cmd_info['desc'].lower()}...")
-        
+
         # Run with conflict checking
         success, output, conflicts = run_safe_graphite_command(repo_root, cmd_info["cmd"], main_app.infos)
-        
+
         if conflicts:
             # Show conflict resolution dialog
             self._show_conflict_resolution_dialog(command_key, cmd_info, conflicts, repo_root)
@@ -446,66 +462,66 @@ class SimpleWorktreeSidebar(QWidget):
                 self._auto_refresh_after_branch_switch()
         else:
             QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
-    
+
     def _show_conflict_resolution_dialog(self, command_key: str, cmd_info: dict, conflicts: dict, repo_root):
         """Show a dialog to help resolve worktree conflicts."""
         dialog = QDialog(self)
         dialog.setWindowTitle("Worktree Conflict Resolution")
         dialog.setModal(True)
         dialog.resize(600, 500)
-        
+
         layout = QVBoxLayout(dialog)
-        
+
         # Header
         header_label = QLabel("⚠️ Worktree Conflict Detected")
         header_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         header_label.setStyleSheet("color: #ff9500;")
         layout.addWidget(header_label)
-        
+
         desc_label = QLabel(f"Cannot {cmd_info['desc'].lower()} due to branch conflicts")
         desc_label.setFont(QFont("Arial", 10))
         layout.addWidget(desc_label)
-        
+
         # Conflicts list
         conflicts_label = QLabel("Conflicting branches:")
         conflicts_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         layout.addWidget(conflicts_label)
-        
+
         conflicts_text = QTextEdit()
         conflicts_text.setMaximumHeight(200)
         conflicts_text.setFont(QFont("Consolas", 9))
-        
+
         # Show conflicts
         conflict_info = []
         for branch, conflict_data in conflicts.items():
             worktree_name = conflict_data['worktree_name']
             conflict_info.append(f"• {branch} → checked out in '{worktree_name}' worktree")
-        
+
         conflicts_text.setPlainText("\n".join(conflict_info))
         conflicts_text.setReadOnly(True)
         layout.addWidget(conflicts_text)
-        
+
         # Suggestions
         suggestions = suggest_conflict_resolution(conflicts, repo_root)
         if suggestions:
             suggestions_label = QLabel("Suggested resolution:")
             suggestions_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
             layout.addWidget(suggestions_label)
-            
+
             suggestions_text = QTextEdit()
             suggestions_text.setMaximumHeight(100)
             suggestions_text.setFont(QFont("Arial", 9))
             suggestions_text.setPlainText("\n".join(suggestions))
             suggestions_text.setReadOnly(True)
             layout.addWidget(suggestions_text)
-        
+
         # Buttons
         button_box = QDialogButtonBox()
-        
+
         cancel_btn = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
         force_btn = button_box.addButton("Force Run Anyway", QDialogButtonBox.ButtonRole.AcceptRole)
         worktrees_btn = button_box.addButton("Open Worktrees", QDialogButtonBox.ButtonRole.ActionRole)
-        
+
         def force_run():
             dialog.accept()
             success, output = run_graphite_command(repo_root, cmd_info["cmd"])
@@ -515,17 +531,17 @@ class SimpleWorktreeSidebar(QWidget):
                     self._auto_refresh_after_branch_switch()
             else:
                 QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
-        
+
         def highlight_conflicts():
             dialog.accept()
             self._highlight_conflicts(conflicts)
-        
+
         cancel_btn.clicked.connect(dialog.reject)
         force_btn.clicked.connect(force_run)
         worktrees_btn.clicked.connect(highlight_conflicts)
-        
+
         layout.addWidget(button_box)
-        
+
         # Apply dark theme
         dialog.setStyleSheet("""
             QDialog {
@@ -552,39 +568,39 @@ class SimpleWorktreeSidebar(QWidget):
                 background-color: #20273a;
             }
         """)
-        
+
         dialog.exec()
-    
+
     def _highlight_conflicts(self, conflicts: dict):
         """Highlight conflicting worktrees in the main UI."""
         main_app = self._get_main_app()
         if main_app:
             conflict_names = [data['worktree_name'] for data in conflicts.values()]
             main_app._set_status(f"Conflicting worktrees: {', '.join(conflict_names)}")
-    
+
     def _show_stack_visualization(self, output: str):
         """Show stack visualization in a dedicated dialog."""
         dialog = QDialog(self)
         dialog.setWindowTitle("Graphite Stack Visualization")
         dialog.setModal(False)
         dialog.resize(800, 600)
-        
+
         layout = QVBoxLayout(dialog)
-        
+
         # Header
         header = QLabel("📊 Current Stack")
         header.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         header.setStyleSheet("color: #7c7fff;")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
-        
+
         # Stack visualization
         text_widget = QTextEdit()
         text_widget.setFont(QFont("Consolas", 10))
         text_widget.setPlainText(output)
         text_widget.setReadOnly(True)
         layout.addWidget(text_widget)
-        
+
         # Close button
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(dialog.accept)
@@ -600,13 +616,13 @@ class SimpleWorktreeSidebar(QWidget):
                 background-color: #6b6bff;
             }
         """)
-        
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         button_layout.addWidget(close_btn)
         button_layout.addStretch()
         layout.addLayout(button_layout)
-        
+
         # Apply dark theme
         dialog.setStyleSheet("""
             QDialog {
@@ -623,7 +639,7 @@ class SimpleWorktreeSidebar(QWidget):
                 border-radius: 4px;
             }
         """)
-        
+
         dialog.show()
 
     def _on_panel_selected(self, info: WorktreeInfo):
@@ -697,7 +713,7 @@ class SimpleWorktreeSidebar(QWidget):
 
 class BranchSelectionDialog(QDialog):
     """Dialog for selecting branches with search functionality."""
-    
+
     def __init__(self, parent, panel, all_branches, current_branch, recent_branches, repo_root, config):
         super().__init__(parent)
         self.panel = panel
@@ -706,57 +722,57 @@ class BranchSelectionDialog(QDialog):
         self.recent_branches = recent_branches
         self.repo_root = repo_root
         self.config = config
-        
+
         self._setup_ui()
         self._apply_dark_theme()
-        
+
     def _setup_ui(self):
         """Setup the branch selection dialog UI."""
         self.setWindowTitle("Switch Branch")
         self.setModal(True)
         self.resize(450, 600)
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Header
         header_label = QLabel("Switch branch for:")
         header_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         layout.addWidget(header_label)
-        
+
         path_label = QLabel(self.panel.info.path.name)
         path_label.setStyleSheet("color: #7c7fff;")
         layout.addWidget(path_label)
-        
+
         # Search
         search_label = QLabel("Search branches:")
         search_label.setFont(QFont("Arial", 9))
         layout.addWidget(search_label)
-        
+
         self.search_entry = QLineEdit()
         self.search_entry.textChanged.connect(self._update_listbox)
         layout.addWidget(self.search_entry)
-        
+
         # Branch list
         self.listbox = QListWidget()
         self.listbox.itemDoubleClicked.connect(self._do_switch)
         layout.addWidget(self.listbox)
-        
+
         # Buttons
         button_box = QDialogButtonBox()
         cancel_btn = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
         switch_btn = button_box.addButton("Switch", QDialogButtonBox.ButtonRole.AcceptRole)
         switch_btn.setDefault(True)
-        
+
         cancel_btn.clicked.connect(self.reject)
         switch_btn.clicked.connect(self._do_switch)
-        
+
         layout.addWidget(button_box)
-        
+
         # Populate branches
         self._organize_branches()
         self._update_listbox()
         self.search_entry.setFocus()
-    
+
     def _apply_dark_theme(self):
         """Apply dark theme styling."""
         self.setStyleSheet("""
@@ -811,34 +827,34 @@ class BranchSelectionDialog(QDialog):
                 background-color: #6b6bff;
             }
         """)
-    
+
     def _organize_branches(self):
         """Organize branches: current first, then recent, then all others."""
         self.organized_branches = []
-        
+
         # Current branch first (with indicator)
         if self.current_branch and self.current_branch in self.all_branches:
             self.organized_branches.append(f"★ {self.current_branch} (current)")
-            
+
         # Recent branches next (excluding current)
         for branch in self.recent_branches:
             if branch != self.current_branch and branch in self.all_branches:
                 self.organized_branches.append(f"🕒 {branch}")
-        
+
         # Add separator if we have recent branches
         if len(self.organized_branches) > 1:
             self.organized_branches.append("─" * 30)
-        
+
         # All other branches
         for branch in sorted(self.all_branches):
             if branch != self.current_branch and branch not in self.recent_branches:
                 self.organized_branches.append(branch)
-    
+
     def _update_listbox(self):
         """Update the listbox with filtered branches."""
         self.listbox.clear()
         search_text = self.search_entry.text().lower()
-        
+
         current_selection = None
         for i, branch_display in enumerate(self.organized_branches):
             if search_text in branch_display.lower():
@@ -847,10 +863,10 @@ class BranchSelectionDialog(QDialog):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                     item.setData(Qt.ItemDataRole.UserRole, "separator")
                 self.listbox.addItem(item)
-                
+
                 if branch_display.startswith("★"):
                     current_selection = self.listbox.count() - 1
-        
+
         # Select current branch if it's in the filtered results
         if current_selection is not None:
             self.listbox.setCurrentRow(current_selection)
@@ -861,30 +877,30 @@ class BranchSelectionDialog(QDialog):
                 if not item.data(Qt.ItemDataRole.UserRole) == "separator":
                     self.listbox.setCurrentRow(i)
                     break
-    
+
     def _do_switch(self):
         """Switch to the selected branch."""
         current_item = self.listbox.currentItem()
         if not current_item or current_item.data(Qt.ItemDataRole.UserRole) == "separator":
             return
-            
+
         branch_display = current_item.text()
-        
+
         # Extract actual branch name
         branch = branch_display
         if branch.startswith("★ "):
             branch = branch[2:].split(" (current)")[0]
         elif branch.startswith("🕒 "):
             branch = branch[2:]
-        
+
         try:
             checkout_branch(self.panel.info.path, branch)
-            
+
             # Track this branch switch in recent branches
             if self.config:
                 push_recent_branch(self.config, self.repo_root, branch)
                 save_config(self.config)
-            
+
             QMessageBox.information(self, "Success", f"Switched to: {branch}")
             self.accept()
         except Exception as e:

@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+
 APP_NAME = "WorktreeManagerClaude"
 RECENTS_MAX = 15
 RECENT_BRANCHES_MAX = 10
@@ -90,18 +91,18 @@ def push_recent_branch(cfg: dict, repo_root: Path, branch: str):
     repo_key = str(repo_root)
     recent_branches = cfg.setdefault("recent_branches", {})
     branch_list = recent_branches.setdefault(repo_key, [])
-    
+
     # Remove if already exists to avoid duplicates
     if branch in branch_list:
         branch_list.remove(branch)
-    
+
     # Insert at beginning
     branch_list.insert(0, branch)
-    
+
     # Limit the list size
     if len(branch_list) > RECENT_BRANCHES_MAX:
         branch_list = branch_list[:RECENT_BRANCHES_MAX]
-    
+
     recent_branches[repo_key] = branch_list
 
 
@@ -159,15 +160,15 @@ def get_agent_command(cfg: dict, agent_id: str = None) -> str:
     """Get the command for a specific agent, or the default agent."""
     if agent_id is None:
         agent_id = get_default_agent(cfg)
-    
+
     agent_config = get_agent_config(cfg, agent_id)
     if agent_config:
         return agent_config.get("command", "claude")
-    
+
     # Fallback to legacy claude_command for backwards compatibility
     if agent_id == "claude":
         return cfg.get("claude_command", "claude")
-    
+
     return "claude"
 
 

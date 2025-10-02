@@ -1,11 +1,11 @@
 """Terminal and editor operations for Worktree Manager."""
 
 import os
-import sys
 import shlex
 import subprocess
+import sys
 from pathlib import Path
-from PySide6.QtCore import Qt
+
 from PySide6.QtWidgets import QMessageBox
 
 from git_utils import which

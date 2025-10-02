@@ -1,8 +1,8 @@
 """Clipboard utilities for PySide6 widgets."""
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut, QAction
-from PySide6.QtWidgets import QApplication, QMenu, QLineEdit, QComboBox
+from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QMenu
 
 
 def setup_entry_clipboard(entry_widget):
@@ -28,21 +28,21 @@ def setup_entry_context_menu(entry):
     def show_context_menu(position):
         """Show the context menu at the cursor position."""
         context_menu = QMenu(entry)
-        
+
         # Cut action
         cut_action = QAction("Cut", context_menu)
         cut_action.setShortcut(QKeySequence.StandardKey.Cut)
         cut_action.triggered.connect(lambda: cut_from_widget(entry))
         cut_action.setEnabled(entry.hasSelectedText())
         context_menu.addAction(cut_action)
-        
+
         # Copy action
         copy_action = QAction("Copy", context_menu)
         copy_action.setShortcut(QKeySequence.StandardKey.Copy)
         copy_action.triggered.connect(lambda: copy_from_widget(entry))
         copy_action.setEnabled(entry.hasSelectedText())
         context_menu.addAction(copy_action)
-        
+
         # Paste action
         paste_action = QAction("Paste", context_menu)
         paste_action.setShortcut(QKeySequence.StandardKey.Paste)
@@ -50,19 +50,19 @@ def setup_entry_context_menu(entry):
         clipboard = QApplication.clipboard()
         paste_action.setEnabled(clipboard.mimeData().hasText())
         context_menu.addAction(paste_action)
-        
+
         context_menu.addSeparator()
-        
+
         # Select All action
         select_all_action = QAction("Select All", context_menu)
         select_all_action.setShortcut(QKeySequence.StandardKey.SelectAll)
         select_all_action.triggered.connect(entry.selectAll)
         select_all_action.setEnabled(not entry.text().isEmpty())
         context_menu.addAction(select_all_action)
-        
+
         # Show the context menu
         context_menu.exec(entry.mapToGlobal(position))
-    
+
     # Connect the context menu to right-click
     entry.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     entry.customContextMenuRequested.connect(show_context_menu)
