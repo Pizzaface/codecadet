@@ -14,8 +14,8 @@ class SessionManager:
     def __init__(self):
         self.sessions: Dict[str, SessionInfo] = {}  # {worktree_path_str: SessionInfo}
 
-    def register_session(self, worktree_path: Path, process, 
-                         container_frame, command: str):
+    def register_session(self, worktree_path: Path, process: Any, 
+                         container_frame: Any, command: str) -> None:
         """Register a new terminal session for a worktree."""
         path_str = str(worktree_path)
         self.sessions[path_str] = SessionInfo(
@@ -76,6 +76,7 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
 
 
