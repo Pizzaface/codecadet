@@ -510,6 +510,26 @@ class PTYTerminalWidget(QTextEdit):
                 except:
                     pass
     
+    def _load_notification_sound(self):
+        """Load the notification sound file."""
+        # Look for sound file in assets directory
+        sound_path = Path(__file__).parent.parent / "assets" / "done.wav"
+        if sound_path.exists():
+            self.sound_effect.setSource(QUrl.fromLocalFile(str(sound_path)))
+            self.sound_effect.setVolume(0.5)
+        else:
+            pass  # Notification sound not found
+    
+    def _on_bell_triggered(self):
+        """Handle terminal bell event - play sound effect."""
+        # Check if bell is enabled in configuration
+        from config import load_config
+        config = load_config()
+        if config.get("terminal_bell_enabled", True):
+            # Play the existing sound effect (done.wav)
+            if self.sound_effect and self.sound_effect.source():
+                self.sound_effect.play()
+    
     def closeEvent(self, event):
         """Clean up when closing."""
         self._cleanup()
@@ -533,6 +553,7 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
 
 
 
