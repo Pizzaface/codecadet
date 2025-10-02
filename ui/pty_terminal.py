@@ -10,9 +10,10 @@ import termios
 import re
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal, QThread
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QUrl
 from PySide6.QtGui import QFont, QTextCursor, QKeyEvent, QTextCharFormat, QColor, QFontDatabase, QFontMetrics
 from PySide6.QtWidgets import QTextEdit
+from PySide6.QtMultimedia import QSoundEffect
 
 
 class ANSIColorParser:
@@ -525,5 +526,6 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
 
 
