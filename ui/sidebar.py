@@ -81,7 +81,9 @@ class SimpleWorktreePanel(QFrame):
         branch_layout = QHBoxLayout()
         branch_layout.setContentsMargins(0, 0, 0, 0)
 
-        branch_text = "detached" if not self.info.branch else self.info.branch.replace("refs/heads/", "")
+        branch_text = (
+            "detached" if not self.info.branch else self.info.branch.replace("refs/heads/", "")
+        )
         self.branch_label = QLabel(f"Branch: {branch_text}")
         self.branch_label.setFont(QFont("Arial", 10))
         branch_layout.addWidget(self.branch_label)
@@ -143,12 +145,15 @@ class SimpleWorktreePanel(QFrame):
         """Update selection state with dark theme."""
         self.is_selected = selected
         if selected:
-            self.setStyleSheet(self.styleSheet() + """
+            self.setStyleSheet(
+                self.styleSheet()
+                + """
                 QFrame {
                     background-color: #26304a !important;
                     border: none !important;
                 }
-            """)
+            """
+            )
             # Clear attention indicator when switching to this worktree
             self.set_attention(False)
         else:
@@ -161,7 +166,7 @@ class SimpleWorktreePanel(QFrame):
 
     def set_attention(self, on: bool):
         """Show or hide the attention dot."""
-        if hasattr(self, 'attn_label'):
+        if hasattr(self, "attn_label"):
             self.attn_label.setVisible(bool(on))
 
 
@@ -329,7 +334,7 @@ class SimpleWorktreeSidebar(QWidget):
             ("up", "Up", "Move up one branch in the current stack"),
             ("down", "Down", "Move down one branch in the current stack"),
             ("top", "Top", "Go to the top branch of the current stack"),
-            ("bottom", "Base", "Go to the bottom/base branch of the current stack")
+            ("bottom", "Base", "Go to the bottom/base branch of the current stack"),
         ]
 
         for cmd_key, label, tooltip in nav_commands:
@@ -362,8 +367,12 @@ class SimpleWorktreeSidebar(QWidget):
         stack_commands = [
             ("log", "Log", "Show visual stack representation with branch relationships"),
             ("sync", "Sync", "Synchronize the stack with remote repository (may cause conflicts)"),
-            ("restack", "Rebase", "Rebase the entire stack to resolve conflicts (may cause conflicts)"),
-            ("submit", "Submit", "Create/update pull requests for the current stack")
+            (
+                "restack",
+                "Rebase",
+                "Rebase the entire stack to resolve conflicts (may cause conflicts)",
+            ),
+            ("submit", "Submit", "Create/update pull requests for the current stack"),
         ]
 
         for cmd_key, label, tooltip in stack_commands:
@@ -422,7 +431,9 @@ class SimpleWorktreeSidebar(QWidget):
             if command_key == "log":
                 self._show_stack_visualization(output)
             else:
-                QMessageBox.information(self, "Graphite", f"{cmd_info['desc']} completed successfully!\n\n{output}")
+                QMessageBox.information(
+                    self, "Graphite", f"{cmd_info['desc']} completed successfully!\n\n{output}"
+                )
 
             # Auto-refresh after commands that might change branches
             if command_key in ["up", "down", "top", "bottom", "checkout", "sync"]:
@@ -432,7 +443,9 @@ class SimpleWorktreeSidebar(QWidget):
             if "Multiple top branches found" in output:
                 QMessageBox.warning(self, "Multiple Top Branches", output)
             else:
-                QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
+                QMessageBox.critical(
+                    self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}"
+                )
 
     def _run_safe_graphite_command(self, command_key: str, cmd_info: dict):
         """Run a potentially unsafe Graphite command with conflict checking."""
@@ -440,30 +453,40 @@ class SimpleWorktreeSidebar(QWidget):
 
         # Get main app to access worktree info
         main_app = self._get_main_app()
-        if not main_app or not hasattr(main_app, 'infos'):
+        if not main_app or not hasattr(main_app, "infos"):
             # Fallback to basic command if we can't get worktree info
             self._run_basic_graphite_command(command_key, cmd_info)
             return
 
         # Show loading message for longer operations
         if command_key in ["sync", "restack", "submit"]:
-            QMessageBox.information(self, "Graphite", f"Checking for conflicts before {cmd_info['desc'].lower()}...")
+            QMessageBox.information(
+                self, "Graphite", f"Checking for conflicts before {cmd_info['desc'].lower()}..."
+            )
 
         # Run with conflict checking
-        success, output, conflicts = run_safe_graphite_command(repo_root, cmd_info["cmd"], main_app.infos)
+        success, output, conflicts = run_safe_graphite_command(
+            repo_root, cmd_info["cmd"], main_app.infos
+        )
 
         if conflicts:
             # Show conflict resolution dialog
             self._show_conflict_resolution_dialog(command_key, cmd_info, conflicts, repo_root)
         elif success:
-            QMessageBox.information(self, "Graphite", f"{cmd_info['desc']} completed successfully!\n\n{output}")
+            QMessageBox.information(
+                self, "Graphite", f"{cmd_info['desc']} completed successfully!\n\n{output}"
+            )
             # Auto-refresh after successful operations
             if command_key in ["restack", "sync", "modify"]:
                 self._auto_refresh_after_branch_switch()
         else:
-            QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
+            QMessageBox.critical(
+                self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}"
+            )
 
-    def _show_conflict_resolution_dialog(self, command_key: str, cmd_info: dict, conflicts: dict, repo_root):
+    def _show_conflict_resolution_dialog(
+        self, command_key: str, cmd_info: dict, conflicts: dict, repo_root
+    ):
         """Show a dialog to help resolve worktree conflicts."""
         dialog = QDialog(self)
         dialog.setWindowTitle("Worktree Conflict Resolution")
@@ -494,7 +517,7 @@ class SimpleWorktreeSidebar(QWidget):
         # Show conflicts
         conflict_info = []
         for branch, conflict_data in conflicts.items():
-            worktree_name = conflict_data['worktree_name']
+            worktree_name = conflict_data["worktree_name"]
             conflict_info.append(f"• {branch} → checked out in '{worktree_name}' worktree")
 
         conflicts_text.setPlainText("\n".join(conflict_info))
@@ -520,17 +543,23 @@ class SimpleWorktreeSidebar(QWidget):
 
         cancel_btn = button_box.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
         force_btn = button_box.addButton("Force Run Anyway", QDialogButtonBox.ButtonRole.AcceptRole)
-        worktrees_btn = button_box.addButton("Open Worktrees", QDialogButtonBox.ButtonRole.ActionRole)
+        worktrees_btn = button_box.addButton(
+            "Open Worktrees", QDialogButtonBox.ButtonRole.ActionRole
+        )
 
         def force_run():
             dialog.accept()
             success, output = run_graphite_command(repo_root, cmd_info["cmd"])
             if success:
-                QMessageBox.information(self, "Graphite", f"{cmd_info['desc']} completed!\n\n{output}")
+                QMessageBox.information(
+                    self, "Graphite", f"{cmd_info['desc']} completed!\n\n{output}"
+                )
                 if command_key in ["restack", "sync", "modify"]:
                     self._auto_refresh_after_branch_switch()
             else:
-                QMessageBox.critical(self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}")
+                QMessageBox.critical(
+                    self, "Graphite Error", f"Failed to {cmd_info['desc']}:\n\n{output}"
+                )
 
         def highlight_conflicts():
             dialog.accept()
@@ -575,7 +604,7 @@ class SimpleWorktreeSidebar(QWidget):
         """Highlight conflicting worktrees in the main UI."""
         main_app = self._get_main_app()
         if main_app:
-            conflict_names = [data['worktree_name'] for data in conflicts.values()]
+            conflict_names = [data["worktree_name"] for data in conflicts.values()]
             main_app._set_status(f"Conflicting worktrees: {', '.join(conflict_names)}")
 
     def _show_stack_visualization(self, output: str):
@@ -680,7 +709,9 @@ class SimpleWorktreeSidebar(QWidget):
             recent_branches = get_recent_branches(self.config, repo_root) if self.config else []
 
             # Create branch selection dialog
-            dialog = BranchSelectionDialog(self, panel, all_branches, current_branch, recent_branches, repo_root, self.config)
+            dialog = BranchSelectionDialog(
+                self, panel, all_branches, current_branch, recent_branches, repo_root, self.config
+            )
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 self._auto_refresh_after_branch_switch()
 
@@ -691,17 +722,19 @@ class SimpleWorktreeSidebar(QWidget):
         """Auto-refresh the main application after switching branches with enhanced reliability."""
         # Get the main app instance and refresh
         main_app = self._get_main_app()
-        if main_app and hasattr(main_app, 'refresh'):
+        if main_app and hasattr(main_app, "refresh"):
             # Use QTimer to delay refresh slightly to ensure git operation is complete
             QTimer.singleShot(100, main_app.refresh)
             # Also update status to show the refresh happened
-            QTimer.singleShot(200, lambda: main_app._set_status("Auto-refreshed after branch switch"))
+            QTimer.singleShot(
+                200, lambda: main_app._set_status("Auto-refreshed after branch switch")
+            )
 
     def _get_main_app(self):
         """Get the main App instance by traversing the widget hierarchy."""
         widget = self
         while widget:
-            if hasattr(widget, 'refresh') and hasattr(widget, 'repo_root'):
+            if hasattr(widget, "refresh") and hasattr(widget, "repo_root"):
                 return widget  # Found the main App instance
             widget = widget.parent()
         return None
@@ -714,7 +747,9 @@ class SimpleWorktreeSidebar(QWidget):
 class BranchSelectionDialog(QDialog):
     """Dialog for selecting branches with search functionality."""
 
-    def __init__(self, parent, panel, all_branches, current_branch, recent_branches, repo_root, config):
+    def __init__(
+        self, parent, panel, all_branches, current_branch, recent_branches, repo_root, config
+    ):
         super().__init__(parent)
         self.panel = panel
         self.all_branches = all_branches

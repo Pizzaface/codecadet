@@ -9,9 +9,9 @@ import pytest
 
 
 # Mock PySide6 to avoid GUI dependencies in headless environment
-sys.modules['PySide6'] = MagicMock()
-sys.modules['PySide6.QtWidgets'] = MagicMock()
-sys.modules['PySide6.QtCore'] = MagicMock()
+sys.modules["PySide6"] = MagicMock()
+sys.modules["PySide6.QtWidgets"] = MagicMock()
+sys.modules["PySide6.QtCore"] = MagicMock()
 
 from git_utils import (
     add_worktree,
@@ -94,7 +94,7 @@ class TestEnsureRepoRoot:
 class TestGitVersionOk:
     """Tests for git_version_ok function."""
 
-    @patch('git_utils.run_git')
+    @patch("git_utils.run_git")
     def test_git_version_ok_sufficient(self, mock_run_git):
         """Test git_version_ok with sufficient version."""
         mock_result = MagicMock()
@@ -104,7 +104,7 @@ class TestGitVersionOk:
         assert git_version_ok(2, 25) is True
         mock_run_git.assert_called_once_with(["--version"])
 
-    @patch('git_utils.run_git')
+    @patch("git_utils.run_git")
     def test_git_version_ok_insufficient(self, mock_run_git):
         """Test git_version_ok with insufficient version."""
         mock_result = MagicMock()
@@ -113,7 +113,7 @@ class TestGitVersionOk:
 
         assert git_version_ok(2, 25) is False
 
-    @patch('git_utils.run_git')
+    @patch("git_utils.run_git")
     def test_git_version_ok_exact_match(self, mock_run_git):
         """Test git_version_ok with exact version match."""
         mock_result = MagicMock()
@@ -122,7 +122,7 @@ class TestGitVersionOk:
 
         assert git_version_ok(2, 25) is True
 
-    @patch('git_utils.run_git')
+    @patch("git_utils.run_git")
     def test_git_version_ok_parse_error(self, mock_run_git):
         """Test git_version_ok with unparseable version output."""
         mock_result = MagicMock()
@@ -131,7 +131,7 @@ class TestGitVersionOk:
 
         assert git_version_ok(2, 25) is False
 
-    @patch('git_utils.run_git')
+    @patch("git_utils.run_git")
     def test_git_version_ok_command_failure(self, mock_run_git):
         """Test git_version_ok when git command fails."""
         mock_run_git.side_effect = subprocess.CalledProcessError(1, ["git", "--version"])
@@ -277,6 +277,7 @@ class TestPruneWorktrees:
 
         # Manually remove the worktree directory to make it stale
         import shutil
+
         shutil.rmtree(worktree_path)
 
         # Prune should clean up the stale reference
@@ -316,5 +317,3 @@ class TestIntegration:
         # Verify cleanup
         result = run_git(["worktree", "list"], cwd=repo_root)
         assert str(worktree_path) not in result.stdout
-
-

@@ -68,7 +68,10 @@ class CreateDialog(QDialog):
 
         # Setup clipboard functionality and tooltips for path
         setup_entry_clipboard(self.path_entry)
-        add_tooltip(self.path_entry, "Enter the full path where the new worktree should be created.\nSupports clipboard paste (Ctrl+V).")
+        add_tooltip(
+            self.path_entry,
+            "Enter the full path where the new worktree should be created.\nSupports clipboard paste (Ctrl+V).",
+        )
         add_tooltip_to_button(browse_btn, "Browse for a directory to create the worktree")
 
         # Branch section
@@ -81,7 +84,10 @@ class CreateDialog(QDialog):
 
         # Setup clipboard functionality and tooltips for branch
         setup_entry_clipboard(self.branch_entry)
-        add_tooltip(self.branch_entry, "Branch name for the worktree.\nCan be an existing branch or a new branch name.\nSupports clipboard paste (Ctrl+V).")
+        add_tooltip(
+            self.branch_entry,
+            "Branch name for the worktree.\nCan be an existing branch or a new branch name.\nSupports clipboard paste (Ctrl+V).",
+        )
 
         # Base ref section
         base_label = QLabel("Starting point (optional, e.g. main or origin/main):")
@@ -93,7 +99,10 @@ class CreateDialog(QDialog):
 
         # Setup clipboard functionality and tooltips for base
         setup_entry_clipboard(self.base_entry)
-        add_tooltip(self.base_entry, "Starting point for new branch (optional).\nExamples: 'main', 'origin/main', commit hash.\nLeave empty to use current HEAD.\nSupports clipboard paste (Ctrl+V).")
+        add_tooltip(
+            self.base_entry,
+            "Starting point for new branch (optional).\nExamples: 'main', 'origin/main', commit hash.\nLeave empty to use current HEAD.\nSupports clipboard paste (Ctrl+V).",
+        )
 
         layout.addLayout(form_layout)
 
@@ -168,11 +177,7 @@ class CreateDialog(QDialog):
     def _browse(self):
         """Open file dialog to browse for worktree directory."""
         init_dir = str(self.repo_root.parent)
-        chosen = QFileDialog.getExistingDirectory(
-            self,
-            "Choose new worktree directory",
-            init_dir
-        )
+        chosen = QFileDialog.getExistingDirectory(self, "Choose new worktree directory", init_dir)
         if chosen:
             self.path_entry.setText(chosen)
 
@@ -181,9 +186,7 @@ class CreateDialog(QDialog):
         path = self.path_entry.text().strip()
         if not path:
             QMessageBox.critical(
-                self,
-                "Missing path",
-                "Please choose a target directory for the new worktree."
+                self, "Missing path", "Please choose a target directory for the new worktree."
             )
             return
 
@@ -210,6 +213,7 @@ class AgentConfigDialog(QDialog):
             set_agent_config,
             set_default_agent,
         )
+
         self.get_coding_agents = get_coding_agents
         self.get_default_agent = get_default_agent
         self.set_agent_config = set_agent_config
@@ -515,10 +519,11 @@ class AgentConfigDialog(QDialog):
             return
 
         reply = QMessageBox.question(
-            self, "Remove Agent",
+            self,
+            "Remove Agent",
             f"Are you sure you want to remove the '{agent_id}' agent?",
             QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.No,
         )
 
         if reply == QMessageBox.Yes:
@@ -535,8 +540,7 @@ class AgentConfigDialog(QDialog):
 
         if not agent_id or not name or not command:
             QMessageBox.warning(
-                self, "Invalid Configuration",
-                "Please fill in all fields (ID, Name, and Command)."
+                self, "Invalid Configuration", "Please fill in all fields (ID, Name, and Command)."
             )
             return
 

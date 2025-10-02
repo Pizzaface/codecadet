@@ -6,9 +6,9 @@ from pathlib import Path
 
 
 # Mock PySide6 to avoid GUI dependencies in headless environment
-sys.modules['PySide6'] = __import__('unittest.mock').MagicMock()
-sys.modules['PySide6.QtWidgets'] = __import__('unittest.mock').MagicMock()
-sys.modules['PySide6.QtCore'] = __import__('unittest.mock').MagicMock()
+sys.modules["PySide6"] = __import__("unittest.mock").MagicMock()
+sys.modules["PySide6.QtWidgets"] = __import__("unittest.mock").MagicMock()
+sys.modules["PySide6.QtCore"] = __import__("unittest.mock").MagicMock()
 
 from config import (
     get_agent_command,
@@ -202,7 +202,7 @@ class TestMigrateLegacyConfig:
         legacy_config = {
             "claude_command": "claude-legacy",
             "claude_args": ["--legacy"],
-            "recent_repos": ["/old/repo"]
+            "recent_repos": ["/old/repo"],
         }
 
         migrate_legacy_config(legacy_config)
@@ -225,4 +225,3 @@ class TestMigrateLegacyConfig:
 
         # Should remain unchanged
         assert sample_config == original_config
-

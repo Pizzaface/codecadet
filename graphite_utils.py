@@ -34,7 +34,7 @@ def is_graphite_repo(repo_path: Path) -> bool:
             [gt_cmd, "--cwd", str(repo_path), "info", "--quiet"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
         return result.returncode == 0
     except Exception:
@@ -52,7 +52,7 @@ def is_branch_in_stack(repo_path: Path, branch: str) -> bool:
             [gt_cmd, "--cwd", str(repo_path), "info", branch, "--quiet"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
         return result.returncode == 0
     except Exception:
@@ -70,12 +70,12 @@ def get_current_branch_info(repo_path: Path) -> dict:
             [gt_cmd, "--cwd", str(repo_path), "info", "--quiet"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
 
         if result.returncode == 0:
             # Parse the output for useful info
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             info = {}
             for line in lines:
                 if ":" in line:
@@ -88,7 +88,9 @@ def get_current_branch_info(repo_path: Path) -> dict:
     return {}
 
 
-def run_graphite_command(repo_path: Path, command: list[str], allow_interactive: bool = False) -> tuple[bool, str]:
+def run_graphite_command(
+    repo_path: Path, command: list[str], allow_interactive: bool = False
+) -> tuple[bool, str]:
     """Run a Graphite command and return success status and output."""
     try:
         gt_cmd = find_graphite_cli()
@@ -105,12 +107,7 @@ def run_graphite_command(repo_path: Path, command: list[str], allow_interactive:
                 # Add --select flag to auto-select first option when there are multiple
                 full_cmd.extend(["--select", "0"])
 
-        result = subprocess.run(
-            full_cmd,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        result = subprocess.run(full_cmd, capture_output=True, text=True, timeout=30)
 
         output = result.stdout.strip() or result.stderr.strip()
 
@@ -118,7 +115,10 @@ def run_graphite_command(repo_path: Path, command: list[str], allow_interactive:
         if result.returncode != 0 and "Multiple branches found" in output:
             # Try again with interactive selection disabled for now
             # The UI will handle this case by showing the error to the user
-            return False, f"Multiple top branches found in stack. Please use the branch switcher to select a specific branch.\n\n{output}"
+            return (
+                False,
+                f"Multiple top branches found in stack. Please use the branch switcher to select a specific branch.\n\n{output}",
+            )
 
         return result.returncode == 0, output
 
@@ -145,13 +145,13 @@ def get_stack_branches(repo_path: Path, branch: str | None = None) -> list[str]:
         if result.returncode == 0:
             # Parse the output to extract branch names
             branches = []
-            for line in result.stdout.split('\n'):
+            for line in result.stdout.split("\n"):
                 line = line.strip()
-                if line and not line.startswith('◯') and not line.startswith('│'):
+                if line and not line.startswith("◯") and not line.startswith("│"):
                     # Extract branch name from the log output
                     parts = line.split()
                     if len(parts) > 0:
-                        branch_name = parts[0].strip('◯○●').strip()
+                        branch_name = parts[0].strip("◯○●").strip()
                         if branch_name and branch_name not in branches:
                             branches.append(branch_name)
             return branches
@@ -161,7 +161,9 @@ def get_stack_branches(repo_path: Path, branch: str | None = None) -> list[str]:
     return []
 
 
-def check_worktree_conflicts(repo_path: Path, worktrees_info: Any, target_branches: list[str]) -> dict:
+def check_worktree_conflicts(
+    repo_path: Path, worktrees_info: Any, target_branches: list[str]
+) -> dict:
     """Check if any target branches are currently checked out in other worktrees."""
     conflicts = {}
 
@@ -177,9 +179,9 @@ def check_worktree_conflicts(repo_path: Path, worktrees_info: Any, target_branch
         # Check if this branch is in our target list
         if branch_name in target_branches:
             conflicts[branch_name] = {
-                'worktree_path': worktree.path,
-                'worktree_name': worktree.path.name,
-                'is_main': worktree.is_main
+                "worktree_path": worktree.path,
+                "worktree_name": worktree.path.name,
+                "is_main": worktree.is_main,
             }
 
     return conflicts
@@ -190,21 +192,25 @@ def suggest_conflict_resolution(conflicts: dict, current_worktree: Path) -> list
     suggestions = []
 
     for branch, conflict_info in conflicts.items():
-        worktree_path = conflict_info['worktree_path']
-        worktree_name = conflict_info['worktree_name']
+        worktree_path = conflict_info["worktree_path"]
+        worktree_name = conflict_info["worktree_name"]
 
         if worktree_path == current_worktree:
             continue  # Skip current worktree
 
-        if conflict_info['is_main']:
+        if conflict_info["is_main"]:
             suggestions.append(f"• Switch '{branch}' in main worktree to trunk/main")
         else:
-            suggestions.append(f"• Switch '{branch}' in '{worktree_name}' worktree to a different branch")
+            suggestions.append(
+                f"• Switch '{branch}' in '{worktree_name}' worktree to a different branch"
+            )
 
     return suggestions
 
 
-def run_safe_graphite_command(repo_path: Path, command: list[str], worktrees_info: Any) -> tuple[bool, str, dict]:
+def run_safe_graphite_command(
+    repo_path: Path, command: list[str], worktrees_info: Any
+) -> tuple[bool, str, dict]:
     """Run a Graphite command with pre-flight conflict checking."""
     # Commands that might cause conflicts with worktrees
     conflict_prone_commands = ["restack", "sync", "modify", "squash", "fold"]
@@ -216,7 +222,9 @@ def run_safe_graphite_command(repo_path: Path, command: list[str], worktrees_inf
             current_branch = None
             result = subprocess.run(
                 ["git", "-C", str(repo_path), "branch", "--show-current"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 current_branch = result.stdout.strip()
@@ -235,7 +243,11 @@ def run_safe_graphite_command(repo_path: Path, command: list[str], worktrees_inf
         return success, output, {}
 
     # Return conflict information for UI to handle
-    return False, f"Potential worktree conflicts detected for branches: {', '.join(conflicts.keys())}", conflicts
+    return (
+        False,
+        f"Potential worktree conflicts detected for branches: {', '.join(conflicts.keys())}",
+        conflicts,
+    )
 
 
 # Common Graphite commands that would be useful in the UI
@@ -243,24 +255,36 @@ GRAPHITE_COMMANDS = {
     # Navigation commands
     "up": {"cmd": ["up"], "desc": "Move up one branch in stack", "icon": "⬆️", "safe": True},
     "down": {"cmd": ["down"], "desc": "Move down one branch in stack", "icon": "⬇️", "safe": True},
-    "top": {"cmd": ["top"], "desc": "Go to top of current stack", "icon": "🔝", "safe": True, "allow_interactive": True},
-    "bottom": {"cmd": ["bottom"], "desc": "Go to bottom of current stack", "icon": "⬇️", "safe": True},
-
+    "top": {
+        "cmd": ["top"],
+        "desc": "Go to top of current stack",
+        "icon": "🔝",
+        "safe": True,
+        "allow_interactive": True,
+    },
+    "bottom": {
+        "cmd": ["bottom"],
+        "desc": "Go to bottom of current stack",
+        "icon": "⬇️",
+        "safe": True,
+    },
     # Stack management
     "log": {"cmd": ["log"], "desc": "Show stack visualization", "icon": "📊", "safe": True},
     "submit": {"cmd": ["submit"], "desc": "Submit current stack", "icon": "🚀", "safe": False},
     "sync": {"cmd": ["sync"], "desc": "Sync with remote", "icon": "🔄", "safe": False},
     "restack": {"cmd": ["restack"], "desc": "Rebase stack", "icon": "⚡", "safe": False},
-
     # Branch operations
     "create": {"cmd": ["create"], "desc": "Create new branch", "icon": "➕", "safe": True},
     "modify": {"cmd": ["modify"], "desc": "Modify current branch", "icon": "✏️", "safe": False},
-    "checkout": {"cmd": ["checkout"], "desc": "Interactive checkout", "icon": "🔀", "safe": True, "allow_interactive": True},
-
+    "checkout": {
+        "cmd": ["checkout"],
+        "desc": "Interactive checkout",
+        "icon": "🔀",
+        "safe": True,
+        "allow_interactive": True,
+    },
     # Info commands
     "info": {"cmd": ["info"], "desc": "Show branch info", "icon": "ℹ️", "safe": True},
     "parent": {"cmd": ["parent"], "desc": "Show parent branch", "icon": "⬆️", "safe": True},
     "children": {"cmd": ["children"], "desc": "Show child branches", "icon": "⬇️", "safe": True},
 }
-
-

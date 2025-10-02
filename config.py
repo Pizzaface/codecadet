@@ -21,11 +21,7 @@ DEFAULT_CONFIG = {
     "claude_command": "claude",  # override if you use a different CLI (deprecated, use coding_agents)
     "recent_branches": {},  # dict[str, list[str]] - repo_path -> [branch_names]
     "coding_agents": {  # dict[str, dict] - agent configurations
-        "claude": {
-            "command": "claude",
-            "name": "Claude Code",
-            "enabled": True
-        }
+        "claude": {"command": "claude", "name": "Claude Code", "enabled": True}
     },
     "default_agent": "claude",  # str - default agent to use
 }
@@ -128,14 +124,12 @@ def get_default_agent(cfg: dict) -> str:
     return cfg.get("default_agent", "claude")
 
 
-def set_agent_config(cfg: dict, agent_id: str, name: str, command: str, enabled: bool = True) -> None:
+def set_agent_config(
+    cfg: dict, agent_id: str, name: str, command: str, enabled: bool = True
+) -> None:
     """Set configuration for a coding agent."""
     agents = cfg.setdefault("coding_agents", {})
-    agents[agent_id] = {
-        "name": name,
-        "command": command,
-        "enabled": enabled
-    }
+    agents[agent_id] = {"name": name, "command": command, "enabled": enabled}
 
 
 def remove_agent_config(cfg: dict, agent_id: str) -> None:
@@ -177,16 +171,6 @@ def migrate_legacy_config(cfg: dict) -> None:
     if "claude_command" in cfg and "coding_agents" not in cfg:
         claude_cmd = cfg["claude_command"]
         cfg["coding_agents"] = {
-            "claude": {
-                "command": claude_cmd,
-                "name": "Claude Code",
-                "enabled": True
-            }
+            "claude": {"command": claude_cmd, "name": "Claude Code", "enabled": True}
         }
         cfg["default_agent"] = "claude"
-
-
-
-
-
-

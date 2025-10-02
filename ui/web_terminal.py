@@ -51,26 +51,27 @@ class TerminalBridge(QObject):
             if pid == 0:  # Child process
                 # Close parent's stdout/stderr to prevent interference
                 import sys
+
                 sys.stdout.flush()
                 sys.stderr.flush()
 
                 # Set environment for proper terminal and character support
-                os.environ['TERM'] = 'xterm-256color'
-                os.environ['COLUMNS'] = '120'  # Wider default
-                os.environ['LINES'] = '30'     # Taller default
-                os.environ['LANG'] = 'en_US.UTF-8'
-                os.environ['LC_ALL'] = 'en_US.UTF-8'
-                os.environ['LC_CTYPE'] = 'en_US.UTF-8'
-                os.environ['COLORTERM'] = 'truecolor'
-                os.environ['CLICOLOR'] = '1'
-                os.environ['CLICOLOR_FORCE'] = '1'
-                os.environ['PYTHONIOENCODING'] = 'utf-8'
+                os.environ["TERM"] = "xterm-256color"
+                os.environ["COLUMNS"] = "120"  # Wider default
+                os.environ["LINES"] = "30"  # Taller default
+                os.environ["LANG"] = "en_US.UTF-8"
+                os.environ["LC_ALL"] = "en_US.UTF-8"
+                os.environ["LC_CTYPE"] = "en_US.UTF-8"
+                os.environ["COLORTERM"] = "truecolor"
+                os.environ["CLICOLOR"] = "1"
+                os.environ["CLICOLOR_FORCE"] = "1"
+                os.environ["PYTHONIOENCODING"] = "utf-8"
 
                 # Change to working directory
                 os.chdir(cwd)
 
                 # Execute shell command
-                os.execv('/bin/zsh', ['/bin/zsh', '-c', command])
+                os.execv("/bin/zsh", ["/bin/zsh", "-c", command])
 
             else:  # Parent process
                 self.master_fd = fd
@@ -106,7 +107,7 @@ class TerminalBridge(QObject):
                         # Indicate activity (output)
                         self.activity.emit()
                         # Emit base64 to preserve bytes and escape sequences
-                        b64 = base64.b64encode(data).decode('ascii')
+                        b64 = base64.b64encode(data).decode("ascii")
                         self.data_received.emit(b64)
                     else:
                         break
@@ -143,7 +144,7 @@ class TerminalBridge(QObject):
         self.last_input_time = time.time()
         self._activity_seen = True
         # If user submitted (pressed Enter), arm tracking for this request
-        if '\r' in data:
+        if "\r" in data:
             self.tracking_enabled = True
             self._awaiting_output = True
             self.inactivity_triggered = False
@@ -154,7 +155,7 @@ class TerminalBridge(QObject):
 
         if self.master_fd and data:
             try:
-                os.write(self.master_fd, data.encode('utf-8'))
+                os.write(self.master_fd, data.encode("utf-8"))
             except OSError:
                 pass
 
@@ -177,8 +178,9 @@ class TerminalBridge(QObject):
                 import fcntl
                 import struct
                 import termios
+
                 # Set the terminal size
-                s = struct.pack('HHHH', rows, cols, 0, 0)
+                s = struct.pack("HHHH", rows, cols, 0, 0)
                 fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
             except OSError:
                 pass
@@ -207,8 +209,9 @@ class TerminalBridge(QObject):
 
 class WebTerminalWidget(QWidget):
     """Web-based terminal widget using xterm.js."""
+
     inactivity_for_worktree = Signal(str)  # Emits worktree path on inactivity
-    activity_for_worktree = Signal(str)    # Emits worktree path on activity
+    activity_for_worktree = Signal(str)  # Emits worktree path on activity
 
     def __init__(self, parent, command, cwd):
         super().__init__(parent)
@@ -238,8 +241,12 @@ class WebTerminalWidget(QWidget):
         self.web_view = QWebEngineView()
 
         # Enable JavaScript
-        self.web_view.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        self.web_view.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        self.web_view.settings().setAttribute(
+            QWebEngineSettings.WebAttribute.JavascriptEnabled, True
+        )
+        self.web_view.settings().setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
+        )
 
         # Set up web channel for communication
         self.channel = QWebChannel()
@@ -267,7 +274,9 @@ class WebTerminalWidget(QWidget):
         if self.bridge.start_pty(command, cwd):
             self.web_view.page().runJavaScript("console.log('PTY started successfully')")
         else:
-            self.web_view.page().runJavaScript("window.writeToTerminal('Failed to start terminal session\\r\\n')")
+            self.web_view.page().runJavaScript(
+                "window.writeToTerminal('Failed to start terminal session\\r\\n')"
+            )
 
     def _on_data_received(self, data):
         """Handle data received from PTY (base64-encoded bytes)."""

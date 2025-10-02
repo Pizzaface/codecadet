@@ -45,24 +45,80 @@ def launch_claude_in_terminal(cwd: Path, claude_cmd: str = "claude"):
 
     # macOS
     if sys.platform == "darwin":
-        osa = f'''
+        osa = f"""
         tell application "Terminal"
             activate
             do script "cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}"
         end tell
-        '''
+        """
         subprocess.Popen(["osascript", "-e", osa], cwd=str(cwd))
         return
 
     # Linux / Unix – try common terminals
     candidates = [
-        ("x-terminal-emulator", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("gnome-terminal", ["--", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("konsole", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("xfce4-terminal", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("xterm", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("alacritty", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash']),
-        ("kitty", ["-e", "sh", "-lc", f'cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec sh']),
+        (
+            "x-terminal-emulator",
+            [
+                "-e",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "gnome-terminal",
+            [
+                "--",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "konsole",
+            [
+                "-e",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "xfce4-terminal",
+            [
+                "-e",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "xterm",
+            [
+                "-e",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "alacritty",
+            [
+                "-e",
+                "bash",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec bash",
+            ],
+        ),
+        (
+            "kitty",
+            [
+                "-e",
+                "sh",
+                "-lc",
+                f"cd {shlex.quote(str(cwd))} && {cmd}; cd {shlex.quote(str(cwd))}; exec sh",
+            ],
+        ),
     ]
     for term, args in candidates:
         if which(term):
@@ -85,23 +141,23 @@ def launch_terminal_only(cwd: Path):
 
     # macOS
     if sys.platform == "darwin":
-        osa = f'''
+        osa = f"""
         tell application "Terminal"
             activate
             do script "cd {shlex.quote(str(cwd))}"
         end tell
-        '''
+        """
         subprocess.Popen(["osascript", "-e", osa], cwd=str(cwd))
         return
 
     # Linux / Unix – try common terminals
     candidates = [
-        ("x-terminal-emulator", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))}; exec bash']),
-        ("gnome-terminal", ["--", "bash", "-lc", f'cd {shlex.quote(str(cwd))}; exec bash']),
+        ("x-terminal-emulator", ["-e", "bash", "-lc", f"cd {shlex.quote(str(cwd))}; exec bash"]),
+        ("gnome-terminal", ["--", "bash", "-lc", f"cd {shlex.quote(str(cwd))}; exec bash"]),
         ("konsole", ["--workdir", str(cwd)]),
         ("xfce4-terminal", ["--working-directory", str(cwd)]),
-        ("xterm", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))}; exec bash']),
-        ("alacritty", ["-e", "bash", "-lc", f'cd {shlex.quote(str(cwd))}; exec bash']),
+        ("xterm", ["-e", "bash", "-lc", f"cd {shlex.quote(str(cwd))}; exec bash"]),
+        ("alacritty", ["-e", "bash", "-lc", f"cd {shlex.quote(str(cwd))}; exec bash"]),
         ("kitty", ["-d", str(cwd)]),
     ]
     for term, args in candidates:
@@ -110,4 +166,3 @@ def launch_terminal_only(cwd: Path):
             return
     # If no terminal found, show error
     QMessageBox.critical(None, "Error", "No supported terminal emulator found.")
-

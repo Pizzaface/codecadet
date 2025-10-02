@@ -13,7 +13,9 @@ def which(cmd: str) -> str | None:
     return shutil.which(cmd)
 
 
-def run_git(args: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run_git(
+    args: list[str], cwd: Path | None = None, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     """Run a git command with safe argument passing."""
     cmd = ["git"] + list(args)
     try:
@@ -84,8 +86,9 @@ def _block_to_info(block: dict) -> WorktreeInfo:
             branch = br
     locked = "locked" in block
     prunable = "prunable" in block
-    return WorktreeInfo(path=path, head=head, branch=branch,
-                        locked=locked, prunable=prunable, is_main=False)
+    return WorktreeInfo(
+        path=path, head=head, branch=branch, locked=locked, prunable=prunable, is_main=False
+    )
 
 
 def list_worktrees(repo_root: Path) -> list[WorktreeInfo]:
@@ -106,7 +109,9 @@ def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: 
     """Add a new worktree."""
     args = ["-C", str(repo_root), "worktree", "add"]
     if branch:
-        exists = run_git(["-C", str(repo_root), "rev-parse", "--verify", f"refs/heads/{branch}"], check=False)
+        exists = run_git(
+            ["-C", str(repo_root), "rev-parse", "--verify", f"refs/heads/{branch}"], check=False
+        )
         if exists.returncode != 0:
             args += ["-b", branch]
     args.append(str(new_path))
@@ -147,12 +152,3 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
-
-
-
-
-
-
-
-
-

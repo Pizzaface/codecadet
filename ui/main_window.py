@@ -94,7 +94,7 @@ class App(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Git version",
-                "Git 2.5+ is recommended for worktrees. Some features may not work as expected."
+                "Git 2.5+ is recommended for worktrees. Some features may not work as expected.",
             )
 
         # Restore window geometry and last repo
@@ -125,10 +125,12 @@ class App(QMainWindow):
 
         # Setup clipboard functionality for repository entry
         setup_entry_clipboard(self.repo_combo.lineEdit())
-        add_tooltip(self.repo_combo,
-                   "Enter or select a Git repository path.\n"
-                   "Recent repositories are shown in dropdown.\n"
-                   "Supports clipboard paste (Ctrl+V).")
+        add_tooltip(
+            self.repo_combo,
+            "Enter or select a Git repository path.\n"
+            "Recent repositories are shown in dropdown.\n"
+            "Supports clipboard paste (Ctrl+V).",
+        )
 
         pick_btn = QPushButton("Pick…")
         pick_btn.clicked.connect(self.choose_repo)
@@ -149,7 +151,10 @@ class App(QMainWindow):
         self.auto_reopen_cb.setChecked(bool(self.cfg.get("auto_reopen_last", True)))
         self.auto_reopen_cb.toggled.connect(self._persist_auto_reopen)
         top_layout.addWidget(self.auto_reopen_cb)
-        add_tooltip(self.auto_reopen_cb, "Automatically reopen the last used repository when starting the application")
+        add_tooltip(
+            self.auto_reopen_cb,
+            "Automatically reopen the last used repository when starting the application",
+        )
 
         main_layout.addLayout(top_layout)
 
@@ -161,7 +166,7 @@ class App(QMainWindow):
             splitter,
             on_worktree_select=self._on_sidebar_select,
             get_repo_root=lambda: self.repo_root,
-            get_branches=self._get_branches
+            get_branches=self._get_branches,
         )
         self.sidebar.set_config(self.cfg)  # Pass config for recent branches tracking
         splitter.addWidget(self.sidebar)
@@ -171,7 +176,7 @@ class App(QMainWindow):
             splitter,
             get_selected_cwd=lambda: self.sidebar.get_selected_worktree(),
             claude_cmd_getter=lambda: get_agent_command(self.cfg),
-            config_getter=lambda: self.cfg
+            config_getter=lambda: self.cfg,
         )
         splitter.addWidget(self.term)
 
@@ -197,7 +202,9 @@ class App(QMainWindow):
         remove_btn = QPushButton("Remove worktree")
         remove_btn.clicked.connect(self.remove_selected)
         bottom_layout.addWidget(remove_btn)
-        add_tooltip_to_button(remove_btn, "Remove the selected worktree\n(Cannot remove the main worktree)")
+        add_tooltip_to_button(
+            remove_btn, "Remove the selected worktree\n(Cannot remove the main worktree)"
+        )
 
         prune_btn = QPushButton("Prune stale")
         prune_btn.clicked.connect(self.prune)
@@ -223,7 +230,9 @@ class App(QMainWindow):
         claude_btn = QPushButton("Run")
         claude_btn.clicked.connect(self.launch_claude)
         agent_layout.addWidget(claude_btn)
-        add_tooltip_to_button(claude_btn, "Launch the selected coding agent in the selected worktree")
+        add_tooltip_to_button(
+            claude_btn, "Launch the selected coding agent in the selected worktree"
+        )
 
         bottom_layout.addLayout(agent_layout)
 
@@ -242,11 +251,11 @@ class App(QMainWindow):
         # Status tooltip for additional information
         self.status_tooltip = StatusTooltip(status_label)
 
-
     def _play_notification_sound(self):
         try:
             if self._notif_sound and self._notif_sound.source():
                 import time
+
                 now = time.time()
                 # Rate-limit to avoid rapid repeats
                 if (now - self._last_sound_time) >= 4.0:
@@ -623,7 +632,7 @@ class App(QMainWindow):
             "• Recents + auto‑reopen\n"
             "• Modern dark UI\n"
             "• Embedded terminal via xterm on Linux\n"
-            "Built with PySide6 for cross-platform compatibility."
+            "Built with PySide6 for cross-platform compatibility.",
         )
 
     def _restore_settings(self):
@@ -632,10 +641,10 @@ class App(QMainWindow):
         if geom:
             try:
                 # Parse geometry string (e.g., "1000x600+100+100")
-                if 'x' in geom and '+' in geom:
-                    size_part, pos_part = geom.split('+', 1)
-                    width, height = map(int, size_part.split('x'))
-                    x, y = map(int, pos_part.split('+'))
+                if "x" in geom and "+" in geom:
+                    size_part, pos_part = geom.split("+", 1)
+                    width, height = map(int, size_part.split("x"))
+                    x, y = map(int, pos_part.split("+"))
                     self.resize(width, height)
                     self.move(x, y)
             except (ValueError, IndexError) as e:
@@ -719,7 +728,9 @@ class App(QMainWindow):
 
     def _on_sidebar_select(self, worktree_info: WorktreeInfo):
         """Called when a worktree is selected in the sidebar."""
-        branch_name = worktree_info.branch.replace("refs/heads/", "") if worktree_info.branch else "detached"
+        branch_name = (
+            worktree_info.branch.replace("refs/heads/", "") if worktree_info.branch else "detached"
+        )
         self._set_status(f"🗂️ Selected: {worktree_info.path.name} (branch: {branch_name})")
 
         # Switch terminal pane to show this worktree's session
@@ -774,7 +785,9 @@ class App(QMainWindow):
         if not wt:
             return
         if wt.resolve() == repo.resolve():
-            QMessageBox.critical(self, "Cannot remove main worktree", "You cannot remove the main worktree.")
+            QMessageBox.critical(
+                self, "Cannot remove main worktree", "You cannot remove the main worktree."
+            )
             return
 
         reply = QMessageBox.question(
@@ -782,7 +795,7 @@ class App(QMainWindow):
             "Confirm remove",
             f"Remove worktree at:\n{wt}\n\nOnly clean worktrees can be removed.\nUse force?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -846,10 +859,10 @@ class App(QMainWindow):
         self.cfg["auto_reopen_last"] = checked
         save_config(self.cfg)
 
-
     def _open_preferences(self):
         """Open preferences dialog."""
         from .dialogs import AgentConfigDialog
+
         dialog = AgentConfigDialog(self, self.cfg)
         if dialog.exec() == QDialog.Accepted:
             save_config(self.cfg)
@@ -928,12 +941,3 @@ class App(QMainWindow):
             pass
 
         event.accept()
-
-
-
-
-
-
-
-
-

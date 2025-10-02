@@ -155,6 +155,7 @@ class TerminalPane(QWidget):
         """Update the run button text with the default agent name."""
         if self.get_config:
             from config import get_agent_config, get_default_agent
+
             config = self.get_config()
             default_agent = get_default_agent(config)
             agent_config = get_agent_config(config, default_agent)
@@ -277,21 +278,23 @@ class TerminalPane(QWidget):
         # Current PATH is not used directly; we rely on sourced profiles' PATH and append common paths.
         # Common developer tool paths that may not be present depending on how the app was launched
         # (Finder-launched apps often inherit a minimal PATH on macOS)
-        additional_paths = ":".join([
-            "$HOME/.local/bin",
-            "$HOME/.poetry/bin",
-            "$HOME/.pyenv/bin",
-            "$HOME/.pyenv/shims",
-            "$HOME/.asdf/bin",
-            "$HOME/.asdf/shims",
-            "$HOME/.rtx/bin",
-            "$HOME/.deno/bin",
-            "$HOME/.cargo/bin",
-            "/opt/homebrew/bin",
-            "/opt/homebrew/sbin",
-            "/usr/local/bin",
-            "/usr/local/sbin",
-        ])
+        additional_paths = ":".join(
+            [
+                "$HOME/.local/bin",
+                "$HOME/.poetry/bin",
+                "$HOME/.pyenv/bin",
+                "$HOME/.pyenv/shims",
+                "$HOME/.asdf/bin",
+                "$HOME/.asdf/shims",
+                "$HOME/.rtx/bin",
+                "$HOME/.deno/bin",
+                "$HOME/.cargo/bin",
+                "/opt/homebrew/bin",
+                "/opt/homebrew/sbin",
+                "/usr/local/bin",
+                "/usr/local/sbin",
+            ]
+        )
 
         app_dir = Path(__file__).parent.parent
         venv_bin_dir = app_dir / ".venv" / ("Scripts" if sys.platform.startswith("win") else "bin")
@@ -300,22 +303,19 @@ class TerminalPane(QWidget):
         path_cleanup_snippet = ""
         if not sys.platform.startswith("win") and app_venv_bin_str:
             escaped_app_venv_bin = (
-                app_venv_bin_str
-                .replace("\\", "\\\\")
-                .replace('"', '\\"')
-                .replace("$", "\\$")
+                app_venv_bin_str.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
             )
             path_cleanup_snippet = (
                 f'APP_VENV_BIN="{escaped_app_venv_bin}"; '
                 'PATH="$(printf \'%s\' "$PATH" | awk -v RS=: -v ORS=: -v target="$APP_VENV_BIN" \'$0 != target\')"; '
                 'PATH="${PATH%:}"; '
-                'unset APP_VENV_BIN; '
+                "unset APP_VENV_BIN; "
             )
 
         path_append_snippet = (
             f'PATH_EXTRAS="{additional_paths}"; '
             'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
-            'unset PATH_EXTRAS; '
+            "unset PATH_EXTRAS; "
         )
 
         # Choose appropriate shell and profile based on platform
@@ -324,7 +324,7 @@ class TerminalPane(QWidget):
             # Source all relevant zsh and profile files if present, then ensure Homebrew env if available.
             profile_source = (
                 "for f in /etc/zshenv /etc/zprofile /etc/profile ~/.zshenv ~/.zprofile ~/.profile ~/.zshrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done; "
+                'do [ -f "$f" ] && . "$f"; done; '
                 "eval \"$('/opt/homebrew/bin/brew' shellenv)\" 2>/dev/null || "
                 "eval \"$('/usr/local/bin/brew' shellenv)\" 2>/dev/null || true"
             )
@@ -333,21 +333,21 @@ class TerminalPane(QWidget):
             # Source common bash profile files on Linux; cover login and non-login shells.
             profile_source = (
                 "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done"
+                'do [ -f "$f" ] && . "$f"; done'
             )
 
         bash_command = (
-            f'{path_cleanup_snippet}'
-            f'{profile_source}; '  # Source user/system profiles for environment setup
-            f'{path_cleanup_snippet}'
-            f'{path_append_snippet}'  # Extend PATH with common tool locations, preserving profile changes
-            f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
-            f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
-            f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
-            f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
-            f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
-            f'cd {shlex.quote(str(cwd))}; '
-            f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
+            f"{path_cleanup_snippet}"
+            f"{profile_source}; "  # Source user/system profiles for environment setup
+            f"{path_cleanup_snippet}"
+            f"{path_append_snippet}"  # Extend PATH with common tool locations, preserving profile changes
+            f"export LANG=en_US.UTF-8; "  # Ensure UTF-8 locale
+            f"export LC_ALL=en_US.UTF-8; "  # Force UTF-8 for all categories
+            f"export LC_CTYPE=en_US.UTF-8; "  # Character classification
+            f"export PYTHONIOENCODING=utf-8; "  # Python UTF-8 handling
+            f"cd {shlex.quote(str(cwd))} && {claude_cmd}; "
+            f"cd {shlex.quote(str(cwd))}; "
+            f"exec {shell_cmd} -i"  # Interactive shell to maintain environment
         )
 
         # Platform-specific terminal implementation
@@ -356,7 +356,9 @@ class TerminalPane(QWidget):
             self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
         else:
             # Linux: Use xterm embedding
-            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
+            self._start_xterm_terminal(
+                container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str
+            )
 
     def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
         """Start a PTY-based terminal for Mac."""
@@ -387,7 +389,9 @@ class TerminalPane(QWidget):
 
                     def poll(self):
                         # Check if process is still running via bridge
-                        if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
+                        if hasattr(self.widget, "bridge") and hasattr(
+                            self.widget.bridge, "process_pid"
+                        ):
                             try:
                                 os.kill(self.widget.bridge.process_pid, 0)
                                 return None  # Still running
@@ -396,7 +400,7 @@ class TerminalPane(QWidget):
                         return 0
 
                     def terminate(self):
-                        if hasattr(self.widget, 'cleanup'):
+                        if hasattr(self.widget, "cleanup"):
                             self.widget.cleanup()
 
                 # Register this session with mock process
@@ -404,7 +408,7 @@ class TerminalPane(QWidget):
                     worktree_path=cwd,
                     process=MockProcess(terminal_widget),
                     container_frame=container,
-                    command=claude_cmd
+                    command=claude_cmd,
                 )
 
                 self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
@@ -429,7 +433,7 @@ class TerminalPane(QWidget):
 
                     def poll(self):
                         # Check if process is still running
-                        if hasattr(self.widget, 'process_pid'):
+                        if hasattr(self.widget, "process_pid"):
                             try:
                                 os.kill(self.widget.process_pid, 0)
                                 return None  # Still running
@@ -438,7 +442,7 @@ class TerminalPane(QWidget):
                         return 0
 
                     def terminate(self):
-                        if hasattr(self.widget, '_cleanup'):
+                        if hasattr(self.widget, "_cleanup"):
                             self.widget._cleanup()
 
                 # Register this session with mock process
@@ -446,14 +450,18 @@ class TerminalPane(QWidget):
                     worktree_path=cwd,
                     process=MockProcess(terminal_widget),
                     container_frame=container,
-                    command=claude_cmd
+                    command=claude_cmd,
                 )
 
                 self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
 
         except ImportError as e:
             # Fallback to external terminal if no terminal widget available
-            QMessageBox.information(self, "Terminal", f"Embedded terminal not available: {e}. Opening external terminal.")
+            QMessageBox.information(
+                self,
+                "Terminal",
+                f"Embedded terminal not available: {e}. Opening external terminal.",
+            )
             self.open_external()
             container.setParent(None)
             container.deleteLater()
@@ -464,24 +472,36 @@ class TerminalPane(QWidget):
             container.deleteLater()
             self._show_no_session()
 
-    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin=None):
+    def _start_xterm_terminal(
+        self, container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin=None
+    ):
         """Start xterm-based terminal for Linux."""
         cmdline = [
             "xterm",
-            "-into", str(wid),
-            "-geometry", geometry,
-            "-fa", "Monospace",
-            "-fs", "11",
-            "-bg", "black",
-            "-fg", "white",
+            "-into",
+            str(wid),
+            "-geometry",
+            geometry,
+            "-fa",
+            "Monospace",
+            "-fs",
+            "11",
+            "-bg",
+            "black",
+            "-fg",
+            "white",
             # Enhanced clipboard support
             "+sb",  # Disable scrollbar for cleaner look
-            "-xrm", "*VT100.translations: #override \\n" +
-                    "Shift Ctrl <Key>V: insert-selection(CLIPBOARD) \\n" +
-                    "Shift Ctrl <Key>C: copy-selection(CLIPBOARD) \\n" +
-                    "Ctrl <Key>v: insert-selection(CLIPBOARD) \\n" +
-                    "Ctrl <Key>c: copy-selection(CLIPBOARD)",
-            "-e", "bash", "-c", bash_command
+            "-xrm",
+            "*VT100.translations: #override \\n"
+            + "Shift Ctrl <Key>V: insert-selection(CLIPBOARD) \\n"
+            + "Shift Ctrl <Key>C: copy-selection(CLIPBOARD) \\n"
+            + "Ctrl <Key>v: insert-selection(CLIPBOARD) \\n"
+            + "Ctrl <Key>c: copy-selection(CLIPBOARD)",
+            "-e",
+            "bash",
+            "-c",
+            bash_command,
         ]
 
         try:
@@ -491,32 +511,29 @@ class TerminalPane(QWidget):
             # Clear ONLY the virtual environment variables that would confuse Poetry
             # about which project to use, but keep PATH intact
             app_dir = Path(__file__).parent.parent
-            if 'VIRTUAL_ENV' in env:
-                venv_path = env.get('VIRTUAL_ENV', '')
+            if "VIRTUAL_ENV" in env:
+                venv_path = env.get("VIRTUAL_ENV", "")
                 if str(app_dir) in venv_path:
                     # This is the Worktree Manager's venv, clear it
-                    env.pop('VIRTUAL_ENV', None)
-                    env.pop('POETRY_ACTIVE', None)
+                    env.pop("VIRTUAL_ENV", None)
+                    env.pop("POETRY_ACTIVE", None)
                     # But do NOT modify PATH - Poetry binary should still be accessible
 
             if app_venv_bin:
-                env_path = env.get('PATH')
+                env_path = env.get("PATH")
                 if env_path:
                     cleaned_path = self._remove_path_entry(env_path, app_venv_bin)
                     if cleaned_path:
-                        env['PATH'] = cleaned_path
+                        env["PATH"] = cleaned_path
                     else:
-                        env['PATH'] = os.defpath
+                        env["PATH"] = os.defpath
 
             # Using cwd parameter ensures the process starts in the worktree directory
             proc = subprocess.Popen(cmdline, cwd=str(cwd), env=env)
 
             # Register this session
             self.session_manager.register_session(
-                worktree_path=cwd,
-                process=proc,
-                container_frame=container,
-                command=claude_cmd
+                worktree_path=cwd, process=proc, container_frame=container, command=claude_cmd
             )
 
             self.status_lbl.setText(f"Started new session: {cwd.name}")
@@ -530,7 +547,7 @@ class TerminalPane(QWidget):
     def _get_main_app(self):
         widget = self
         while widget:
-            if hasattr(widget, 'notify_inactivity') and hasattr(widget, 'sidebar'):
+            if hasattr(widget, "notify_inactivity") and hasattr(widget, "sidebar"):
                 return widget
             widget = widget.parent()
         return None
@@ -539,10 +556,11 @@ class TerminalPane(QWidget):
         """Receive inactivity from a terminal session and notify the app/sidebar."""
         try:
             from pathlib import Path
+
             session_path = Path(path_str)
             # Always notify the app so it can handle sound and indicators appropriately
             app = self._get_main_app()
-            if app and hasattr(app, 'notify_inactivity'):
+            if app and hasattr(app, "notify_inactivity"):
                 app.notify_inactivity(session_path)
         except (AttributeError, RuntimeError) as e:
             logging.warning(f"Failed to notify inactivity for session {path_str}: {e}")
@@ -552,8 +570,9 @@ class TerminalPane(QWidget):
         """Clear sidebar attention when session shows activity again."""
         try:
             from pathlib import Path
+
             app = self._get_main_app()
-            if app and hasattr(app, 'notify_activity'):
+            if app and hasattr(app, "notify_activity"):
                 app.notify_activity(Path(path_str))
         except (AttributeError, RuntimeError) as e:
             logging.warning(f"Failed to notify activity for session {path_str}: {e}")
@@ -571,7 +590,7 @@ class TerminalPane(QWidget):
             "Terminal Options",
             "Launch with Claude?\n\nYes - Run Claude in terminal\nNo - Just open terminal",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
+            QMessageBox.StandardButton.Yes,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -590,7 +609,3 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
-
-
-
-

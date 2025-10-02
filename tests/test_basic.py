@@ -9,9 +9,9 @@ import pytest
 
 
 # Mock PySide6 to avoid GUI dependencies in headless environment
-sys.modules['PySide6'] = MagicMock()
-sys.modules['PySide6.QtWidgets'] = MagicMock()
-sys.modules['PySide6.QtCore'] = MagicMock()
+sys.modules["PySide6"] = MagicMock()
+sys.modules["PySide6.QtWidgets"] = MagicMock()
+sys.modules["PySide6.QtCore"] = MagicMock()
 
 from config import load_config, save_config
 from git_utils import ensure_repo_root

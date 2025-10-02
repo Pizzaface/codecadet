@@ -155,7 +155,7 @@ class StatusTooltip(QObject):
             "info": {"bg": "#2563eb", "text": "#ffffff"},
             "success": {"bg": "#16a34a", "text": "#ffffff"},
             "warning": {"bg": "#ea580c", "text": "#ffffff"},
-            "error": {"bg": "#dc2626", "text": "#ffffff"}
+            "error": {"bg": "#dc2626", "text": "#ffffff"},
         }
 
         color_scheme = colors.get(message_type, colors["info"])

@@ -25,6 +25,7 @@ def setup_line_edit_clipboard(line_edit):
 
 def setup_entry_context_menu(entry):
     """Add a right-click context menu with clipboard operations."""
+
     def show_context_menu(position):
         """Show the context menu at the cursor position."""
         context_menu = QMenu(entry)

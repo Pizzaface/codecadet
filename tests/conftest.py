@@ -43,16 +43,9 @@ def sample_config() -> dict:
     return {
         "recent_repos": [],
         "recent_branches": {},
-        "agents": {
-            "default": {
-                "command": "claude",
-                "args": []
-            }
-        },
+        "agents": {"default": {"command": "claude", "args": []}},
         "default_agent": "default",
-        "terminal": {
-            "shell": "/bin/bash"
-        }
+        "terminal": {"shell": "/bin/bash"},
     }
 
 

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QWidget
 @dataclass
 class WorktreeInfo:
     """Information about a Git worktree."""
+
     path: Path
     head: str | None
     branch: str | None  # 'refs/heads/feature-x' or None (detached)
@@ -21,6 +22,7 @@ class WorktreeInfo:
 @dataclass
 class SessionInfo:
     """Information about a terminal session for a worktree."""
+
     worktree_path: Path
     process: subprocess.Popen | None
     container_frame: QWidget | None  # The frame containing the xterm
