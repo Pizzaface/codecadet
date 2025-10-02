@@ -1,5 +1,6 @@
 """Session management for terminal sessions in worktrees."""
 
+import logging
 import time
 from pathlib import Path
 from typing import Dict
@@ -73,3 +74,4 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
