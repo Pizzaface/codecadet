@@ -127,7 +127,7 @@ def get_default_agent(cfg: dict) -> str:
     return cfg.get("default_agent", "claude")
 
 
-def set_agent_config(cfg: dict, agent_id: str, name: str, command: str, enabled: bool = True):
+def set_agent_config(cfg: dict, agent_id: str, name: str, command: str, enabled: bool = True) -> None:
     """Set configuration for a coding agent."""
     agents = cfg.setdefault("coding_agents", {})
     agents[agent_id] = {
@@ -183,6 +183,7 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
 
