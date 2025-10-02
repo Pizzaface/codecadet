@@ -225,6 +225,7 @@ class WebTerminalWidget(QWidget):
         self.bridge.data_received.connect(self._on_data_received)
         self.bridge.inactivity_detected.connect(self._on_inactivity_detected)
         self.bridge.activity.connect(self._on_activity)
+        self.bridge.bell_triggered.connect(self._on_bell_triggered)
         
         # Setup sound effect for inactivity notification
         self.sound_effect = QSoundEffect()
@@ -311,5 +312,6 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
