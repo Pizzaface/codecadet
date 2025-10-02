@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+multi_claude_coding.egg-info/PKG-INFO
+multi_claude_coding.egg-info/SOURCES.txt
+multi_claude_coding.egg-info/dependency_links.txt
+multi_claude_coding.egg-info/requires.txt
+multi_claude_coding.egg-info/top_level.txt
+tests/test_config.py
+tests/test_git_utils.py
+ui/__init__.py
+ui/dialogs.py
+ui/main_window.py
+ui/pty_terminal.py
+ui/sidebar.py
+ui/terminal_pane.py
+ui/tooltip.py
+ui/web_terminal.py
