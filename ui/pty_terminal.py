@@ -205,6 +205,8 @@ class PTYReader(QThread):
 class PTYTerminalWidget(QTextEdit):
     """A simple terminal emulator widget using PTY."""
     
+    bell_triggered = Signal()  # Signal when terminal bell is triggered
+    
     def __init__(self, parent, command, cwd):
         super().__init__(parent)
         
@@ -512,3 +514,4 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
