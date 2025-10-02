@@ -4,7 +4,7 @@ import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 from models import WorktreeInfo
 
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
