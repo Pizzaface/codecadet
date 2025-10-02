@@ -713,7 +713,8 @@ class App(QMainWindow):
             try:
                 self.repo_root = ensure_repo_root(Path(val))
                 return self.repo_root
-            except Exception:
+            except (RuntimeError, FileNotFoundError, OSError) as e:
+                logging.error(f"Failed to ensure repo root for '{val}': {e}")
                 pass
         QMessageBox.critical(self, "Select a repository", "Please choose a Git repository.")
         return None
@@ -903,6 +904,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
