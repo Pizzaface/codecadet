@@ -162,7 +162,7 @@ def get_stack_branches(repo_path: Path, branch: Optional[str] = None) -> List[st
     return []
 
 
-def check_worktree_conflicts(repo_path: Path, worktrees_info, target_branches: List[str]) -> dict:
+def check_worktree_conflicts(repo_path: Path, worktrees_info: Any, target_branches: List[str]) -> dict:
     """Check if any target branches are currently checked out in other worktrees."""
     conflicts = {}
     
@@ -263,3 +263,4 @@ GRAPHITE_COMMANDS = {
     "parent": {"cmd": ["parent"], "desc": "Show parent branch", "icon": "⬆️", "safe": True},
     "children": {"cmd": ["children"], "desc": "Show child branches", "icon": "⬇️", "safe": True},
 }
+
