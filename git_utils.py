@@ -40,7 +40,7 @@ def ensure_repo_root(path: Path) -> Path:
     return Path(cp.stdout.strip())
 
 
-def git_version_ok(min_major=2, min_minor=5) -> bool:
+def git_version_ok(min_major: int = 2, min_minor: int = 5) -> bool:
     """Check if Git version meets minimum requirements."""
     try:
         v = run_git(["--version"], check=False).stdout.strip()
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
