@@ -103,7 +103,7 @@ def list_worktrees(repo_root: Path) -> list[WorktreeInfo]:
     return infos
 
 
-def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: str | None):
+def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: str | None) -> None:
     """Add a new worktree."""
     args = ["-C", str(repo_root), "worktree", "add"]
     if branch:
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
