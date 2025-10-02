@@ -51,7 +51,8 @@ class SessionManager:
             if session.process and session.process.poll() is None:
                 try:
                     session.process.terminate()
-                except Exception:
+                except (ProcessLookupError, OSError) as e:
+                    logging.warning(f"Failed to terminate process for {path_str}: {e}")
                     pass
             # Destroy the container frame if it exists
             if session.container_frame:
@@ -74,4 +75,5 @@ class SessionManager:
 
         for path in to_remove:
             self.remove_session(path)
+
 
