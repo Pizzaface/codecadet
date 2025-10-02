@@ -894,7 +894,8 @@ class App(QMainWindow):
             if self.repo_root:
                 self.cfg["last_repo"] = str(self.repo_root)
             save_config(self.cfg)
-        except Exception:
+        except (OSError, PermissionError) as e:
+            logging.error(f"Failed to save configuration on close: {e}")
             pass
         
         # Clean up all terminal sessions
@@ -904,6 +905,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
