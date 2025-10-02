@@ -550,7 +550,8 @@ class TerminalPane(QWidget):
             app = self._get_main_app()
             if app and hasattr(app, 'notify_activity'):
                 app.notify_activity(Path(path_str))
-        except Exception:
+        except (AttributeError, RuntimeError) as e:
+            logging.warning(f"Failed to notify activity for session {path_str}: {e}")
             pass
 
     def open_external(self):
@@ -584,6 +585,7 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
+
 
 
 
