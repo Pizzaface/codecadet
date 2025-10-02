@@ -4,6 +4,12 @@ import json
 import pytest
 from pathlib import Path
 from unittest.mock import patch, mock_open
+import sys
+
+# Mock PySide6 to avoid GUI dependencies in headless environment
+sys.modules['PySide6'] = __import__('unittest.mock').MagicMock()
+sys.modules['PySide6.QtWidgets'] = __import__('unittest.mock').MagicMock()
+sys.modules['PySide6.QtCore'] = __import__('unittest.mock').MagicMock()
 
 from config import (
     load_config,
@@ -220,3 +226,4 @@ class TestMigrateLegacyConfig:
         
         # Should remain unchanged
         assert sample_config == original_config
+
