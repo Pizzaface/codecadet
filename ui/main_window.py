@@ -691,7 +691,8 @@ class App(QMainWindow):
             return []
         try:
             return list_branches(self.repo_root)
-        except Exception:
+        except (RuntimeError, FileNotFoundError) as e:
+            logging.warning(f"Failed to get branches for {self.repo_root}: {e}")
             return []
 
     def _on_sidebar_select(self, worktree_info: WorktreeInfo):
@@ -902,6 +903,7 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
 
 
 
