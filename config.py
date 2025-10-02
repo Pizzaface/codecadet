@@ -59,7 +59,8 @@ def load_config() -> dict:
         for k, v in DEFAULT_CONFIG.items():
             cfg.setdefault(k, v)
         return cfg
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, PermissionError) as e:
+        logging.warning(f"Failed to load config from {p}: {e}. Using defaults.")
         return DEFAULT_CONFIG.copy()
 
 
@@ -182,4 +183,5 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
