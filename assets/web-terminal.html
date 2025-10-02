@@ -71,7 +71,10 @@
             convertEol: false,  // Disable to fix animation newline issues
             scrollOnUserInput: false,  // Don't auto-scroll
             disableStdin: false,
-            allowProposedApi: true
+            allowProposedApi: true,
+            // Bell configuration
+            bellSound: null,  // Disable default bell sound (we'll handle it in Qt)
+            bellStyle: 'sound'  // Enable bell detection
         });
 
         // Add addons
@@ -237,3 +240,4 @@
     </script>
 </body>
 </html>
+
