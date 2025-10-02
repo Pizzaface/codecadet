@@ -147,10 +147,10 @@ class TestAddWorktree:
         
         # Create a test branch first
         run_git(["checkout", "-b", branch_name], cwd=temp_git_repo)
-        run_git(["checkout", "main"], cwd=temp_git_repo, check=False)  # Switch back
+        run_git(["checkout", "master"], cwd=temp_git_repo, check=False)  # Switch back
         
-        # Add worktree
-        add_worktree(temp_git_repo, worktree_path, branch_name)
+        # Add worktree (function signature: repo_root, new_path, branch, base_ref)
+        add_worktree(temp_git_repo, worktree_path, branch_name, None)
         
         # Verify worktree was created
         assert worktree_path.exists()
@@ -314,4 +314,5 @@ class TestIntegration:
         # Verify cleanup
         result = run_git(["worktree", "list"], cwd=repo_root)
         assert str(worktree_path) not in result.stdout
+
 
