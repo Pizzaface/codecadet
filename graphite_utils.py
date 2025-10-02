@@ -60,7 +60,7 @@ def is_branch_in_stack(repo_path: Path, branch: str) -> bool:
         return False
 
 
-def get_current_branch_info(repo_path: Path) -> dict:
+def get_current_branch_info(repo_path: Path) -> Dict[str, str]:
     """Get information about the current branch from Graphite."""
     try:
         gt_cmd = find_graphite_cli()
@@ -289,4 +289,5 @@ GRAPHITE_COMMANDS = {
     "parent": {"cmd": ["parent"], "desc": "Show parent branch", "icon": "⬆️", "safe": True},
     "children": {"cmd": ["children"], "desc": "Show child branches", "icon": "⬇️", "safe": True},
 }
+
 
