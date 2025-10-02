@@ -901,10 +901,12 @@ class App(QMainWindow):
         # Clean up all terminal sessions
         try:
             self.term.cleanup_all_sessions()
-        except Exception:
+        except (AttributeError, RuntimeError) as e:
+            logging.warning(f"Failed to cleanup terminal sessions on close: {e}")
             pass
         
         event.accept()
+
 
 
 
