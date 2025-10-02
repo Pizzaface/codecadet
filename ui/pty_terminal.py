@@ -217,6 +217,13 @@ class PTYTerminalWidget(QTextEdit):
         # Buffer for handling partial ANSI sequences
         self.data_buffer = ""
         
+        # Setup sound effect for bell functionality
+        self.sound_effect = QSoundEffect()
+        self._load_notification_sound()
+        
+        # Connect bell signal to sound handler
+        self.bell_triggered.connect(self._on_bell_triggered)
+        
         # Setup appearance - white text on black for better visibility
         self.setStyleSheet("""
             QTextEdit {
@@ -526,6 +533,7 @@ class PTYTerminalWidget(QTextEdit):
                 os.kill(self.process_pid, 15)  # SIGTERM
             except OSError:
                 pass
+
 
 
 
