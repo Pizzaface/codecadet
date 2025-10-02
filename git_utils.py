@@ -116,7 +116,7 @@ def add_worktree(repo_root: Path, new_path: Path, branch: str | None, base_ref: 
     run_git(args)
 
 
-def remove_worktree(repo_root: Path, wt_path: Path, force=False):
+def remove_worktree(repo_root: Path, wt_path: Path, force: bool = False) -> None:
     """Remove a worktree."""
     args = ["-C", str(repo_root), "worktree", "remove"]
     if force:
@@ -148,6 +148,7 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
 
