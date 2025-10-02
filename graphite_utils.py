@@ -205,7 +205,7 @@ def suggest_conflict_resolution(conflicts: dict, current_worktree: Path) -> List
     return suggestions
 
 
-def run_safe_graphite_command(repo_path: Path, command: List[str], worktrees_info) -> tuple[bool, str, dict]:
+def run_safe_graphite_command(repo_path: Path, command: List[str], worktrees_info: Any) -> tuple[bool, str, dict]:
     """Run a Graphite command with pre-flight conflict checking."""
     # Commands that might cause conflicts with worktrees
     conflict_prone_commands = ["restack", "sync", "modify", "squash", "fold"]
@@ -263,4 +263,5 @@ GRAPHITE_COMMANDS = {
     "parent": {"cmd": ["parent"], "desc": "Show parent branch", "icon": "⬆️", "safe": True},
     "children": {"cmd": ["children"], "desc": "Show child branches", "icon": "⬇️", "safe": True},
 }
+
 
