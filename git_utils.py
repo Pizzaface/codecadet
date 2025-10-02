@@ -97,7 +97,8 @@ def list_worktrees(repo_root: Path) -> list[WorktreeInfo]:
         try:
             if info.path.resolve() == repo_root.resolve():
                 info.is_main = True
-        except Exception:
+        except (OSError, RuntimeError) as e:
+            logging.warning(f"Failed to resolve path for worktree {info.path}: {e}")
             pass
     return infos
 
@@ -147,5 +148,6 @@ def list_branches(repo_root: Path) -> list[str]:
         if line and line not in branches and not line.startswith("HEAD ->"):
             branches.append(line)
     return sorted(set(branches))
+
 
 
