@@ -1,5 +1,6 @@
 """Terminal pane UI component."""
 
+import logging
 import os
 import sys
 import shlex
@@ -581,3 +582,4 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
+
