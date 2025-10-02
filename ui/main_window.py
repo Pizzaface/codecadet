@@ -1,5 +1,6 @@
 """Main window and application logic."""
 
+import logging
 import sys
 from pathlib import Path
 
@@ -897,3 +898,4 @@ class App(QMainWindow):
             pass
         
         event.accept()
+
