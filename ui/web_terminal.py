@@ -304,6 +304,16 @@ class WebTerminalWidget(QWidget):
         # Do not auto-arm tracking here; rely on Enter-based arming
         self.activity_for_worktree.emit(self.cwd_path)
     
+    def _on_bell_triggered(self):
+        """Handle terminal bell event - play sound effect."""
+        # Check if bell is enabled in configuration
+        from config import load_config
+        config = load_config()
+        if config.get("terminal_bell_enabled", True):
+            # Play the existing sound effect (done.wav)
+            if self.sound_effect and self.sound_effect.source():
+                self.sound_effect.play()
+    
     def closeEvent(self, event):
         """Clean up when closing."""
         self.bridge.cleanup()
@@ -312,6 +322,7 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
 
 
 
