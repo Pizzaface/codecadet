@@ -25,6 +25,7 @@ class TerminalBridge(QObject):
     data_received = Signal(str)
     inactivity_detected = Signal()  # Signal when no output for 10 seconds
     activity = Signal()  # Fires on any input or output
+    bell_triggered = Signal()  # Signal when terminal bell is triggered
     
     def __init__(self):
         super().__init__()
@@ -305,3 +306,4 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
