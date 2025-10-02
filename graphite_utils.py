@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 def find_graphite_cli() -> str | None:
@@ -288,3 +289,4 @@ GRAPHITE_COMMANDS = {
     "parent": {"cmd": ["parent"], "desc": "Show parent branch", "icon": "⬆️", "safe": True},
     "children": {"cmd": ["children"], "desc": "Show child branches", "icon": "⬇️", "safe": True},
 }
+
