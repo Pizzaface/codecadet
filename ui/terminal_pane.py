@@ -539,7 +539,8 @@ class TerminalPane(QWidget):
             app = self._get_main_app()
             if app and hasattr(app, 'notify_inactivity'):
                 app.notify_inactivity(session_path)
-        except Exception:
+        except (AttributeError, RuntimeError) as e:
+            logging.warning(f"Failed to notify inactivity for session {path_str}: {e}")
             pass
 
     def _on_session_activity(self, path_str: str):
@@ -583,5 +584,6 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
+
 
 
