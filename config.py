@@ -171,7 +171,7 @@ def get_agent_command(cfg: dict, agent_id: str = None) -> str:
     return "claude"
 
 
-def migrate_legacy_config(cfg: dict):
+def migrate_legacy_config(cfg: dict) -> None:
     """Migrate legacy claude_command to new coding_agents structure."""
     if "claude_command" in cfg and "coding_agents" not in cfg:
         claude_cmd = cfg["claude_command"]
@@ -183,6 +183,7 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
 
