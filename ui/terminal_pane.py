@@ -366,7 +366,8 @@ class TerminalPane(QWidget):
                 try:
                     terminal_widget.inactivity_for_worktree.connect(self._on_session_inactivity)
                     terminal_widget.activity_for_worktree.connect(self._on_session_activity)
-                except Exception:
+                except (AttributeError, RuntimeError) as e:
+                    logging.debug(f"Failed to connect terminal widget signals: {e}")
                     pass
                 
                 # Add to container layout
@@ -582,4 +583,5 @@ class TerminalPane(QWidget):
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_session(Path(path_str))
+
 
