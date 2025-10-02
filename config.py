@@ -64,7 +64,7 @@ def load_config() -> dict:
         return DEFAULT_CONFIG.copy()
 
 
-def save_config(cfg: dict):
+def save_config(cfg: dict) -> None:
     """Save configuration to file."""
     d = _config_dir()
     d.mkdir(parents=True, exist_ok=True)
@@ -183,5 +183,6 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
 
 
