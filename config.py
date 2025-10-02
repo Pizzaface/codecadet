@@ -1,8 +1,9 @@
 """Configuration management for Git Worktree Manager."""
 
+import json
+import logging
 import os
 import sys
-import json
 from pathlib import Path
 
 APP_NAME = "WorktreeManagerClaude"
@@ -181,3 +182,4 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+
