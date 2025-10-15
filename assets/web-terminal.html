@@ -69,7 +69,7 @@
             macOptionIsMeta: true,
             rightClickSelectsWord: true,
             convertEol: false,  // Disable to fix animation newline issues
-            scrollOnUserInput: false,  // Don't auto-scroll
+            scrollOnUserInput: true,  // Scroll to bottom when user types
             disableStdin: false,
             allowProposedApi: true
         });
@@ -179,6 +179,8 @@
             } else {
                 terminal.write(item);
             }
+            // Always scroll to bottom after writing data
+            terminal.scrollToBottom();
         }
 
         function flushPending() {
