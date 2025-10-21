@@ -11,6 +11,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from platform_utils import Platform, Shell, TerminalLauncher
 
+# Skip marker for Unix-only tests
+requires_unix = pytest.mark.skipif(
+    sys.platform.startswith('win'),
+    reason="Requires Unix-specific functionality (os.getuid, pwd module)"
+)
+
 
 class TestPlatform:
     """Tests for Platform class."""
@@ -51,8 +57,9 @@ class TestShell:
                     shell = Shell.get_user_shell()
                     assert shell == '/bin/bash'
 
+    @requires_unix
     def test_get_user_shell_from_pwd(self):
-        """Test shell detection from password database."""
+        """Test shell detection from password database (Unix only)."""
         with patch.dict(os.environ, {}, clear=True):
             with patch('sys.platform', 'linux'):
                 # Mock pwd module
