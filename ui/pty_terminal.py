@@ -1,6 +1,7 @@
 """PTY-based terminal widget for Mac compatibility."""
 
 import os
+import sys
 import pty
 import select
 import subprocess
@@ -13,6 +14,10 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QFont, QTextCursor, QKeyEvent, QTextCharFormat, QColor, QFontDatabase, QFontMetrics
 from PySide6.QtWidgets import QTextEdit
+
+# Import cross-platform utilities
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from platform_utils import Shell
 
 
 class ANSIColorParser:
@@ -261,9 +266,13 @@ class PTYTerminalWidget(QTextEdit):
     def _start_pty_session(self, command, cwd):
         """Start a PTY session with the given command."""
         try:
+            # Get user's default shell
+            shell = Shell.get_user_shell()
+            shell_args = Shell.get_shell_args(shell, command)
+
             # Create PTY
             pid, fd = pty.fork()
-            
+
             if pid == 0:  # Child process
                 # Set environment for proper terminal and character support
                 os.environ['TERM'] = 'xterm-256color'  # Enable color support
@@ -278,12 +287,12 @@ class PTYTerminalWidget(QTextEdit):
                 os.environ['CLICOLOR_FORCE'] = '1'
                 # Ensure proper Unicode handling
                 os.environ['PYTHONIOENCODING'] = 'utf-8'
-                
+
                 # Change to working directory
                 os.chdir(cwd)
-                
-                # Execute shell command
-                os.execv('/bin/zsh', ['/bin/zsh', '-c', command])
+
+                # Execute shell command with detected shell
+                os.execv(shell, shell_args)
             
             else:  # Parent process
                 self.master_fd = fd

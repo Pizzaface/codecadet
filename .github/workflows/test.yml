@@ -1,0 +1,79 @@
+name: Cross-Platform Tests
+
+on:
+  push:
+    branches: [ main, develop, claude/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage.xml
+        flags: ${{ matrix.os }}-py${{ matrix.python-version }}
+        name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        fail_ci_if_error: false
+
+  lint:
+    name: Lint and Style Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy
+
+    - name: Run ruff
+      run: |
+        ruff check . --select E,F,W --ignore E501
+      continue-on-error: true
+
+    - name: Run type checking
+      run: |
+        mypy platform_utils.py --ignore-missing-imports
+      continue-on-error: true

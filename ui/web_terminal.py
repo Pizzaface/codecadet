@@ -1,12 +1,14 @@
 """Web-based terminal widget using xterm.js for better character handling."""
 
 import os
+import sys
 import pty
 import select
 import json
 import threading
 import time
 import base64
+from enum import Enum
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, QObject, Slot, Signal, QTimer
@@ -16,16 +18,31 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtMultimedia import QSoundEffect
 
+# Import cross-platform utilities
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from platform_utils import Shell, Platform
+
 INACTIVITY_TIMER = 3
+
+# PTY is not available on Windows without additional libraries
+HAS_PTY_SUPPORT = not Platform.is_windows()
+
+
+class TerminalState(Enum):
+    """Terminal inactivity tracking states."""
+    IDLE = "idle"  # No tracking active
+    AWAITING_OUTPUT = "awaiting_output"  # Submitted, waiting for first output
+    TRACKING = "tracking"  # Actively tracking inactivity
+    TRIGGERED = "triggered"  # Inactivity notification sent
 
 
 class TerminalBridge(QObject):
     """Bridge between the web terminal and PTY."""
-    
+
     data_received = Signal(str)
-    inactivity_detected = Signal()  # Signal when no output for 10 seconds
+    inactivity_detected = Signal()  # Signal when no output for INACTIVITY_TIMER seconds
     activity = Signal()  # Fires on any input or output
-    
+
     def __init__(self):
         super().__init__()
         self.master_fd = None
@@ -34,25 +51,26 @@ class TerminalBridge(QObject):
         self.running = False
         self.last_output_time = None
         self.last_input_time = None
-        self._activity_seen = False  # Gate inactivity until first activity
-        self.tracking_enabled = False  # Do not track until armed by submit (Enter)
-        self._awaiting_output = False  # After submit, wait for first output before timing
+        self.state = TerminalState.IDLE
         self.inactivity_timer = QTimer()
         self.inactivity_timer.timeout.connect(self._check_inactivity)
         self.inactivity_timer.start(1000)  # Check every second
-        self.inactivity_triggered = False
         
     def start_pty(self, command, cwd):
         """Start PTY process."""
         try:
+            # Get user's default shell
+            shell = Shell.get_user_shell()
+            shell_args = Shell.get_shell_args(shell, command)
+
             pid, fd = pty.fork()
-            
+
             if pid == 0:  # Child process
                 # Close parent's stdout/stderr to prevent interference
                 import sys
                 sys.stdout.flush()
                 sys.stderr.flush()
-                
+
                 # Set environment for proper terminal and character support
                 os.environ['TERM'] = 'xterm-256color'
                 os.environ['COLUMNS'] = '120'  # Wider default
@@ -64,12 +82,12 @@ class TerminalBridge(QObject):
                 os.environ['CLICOLOR'] = '1'
                 os.environ['CLICOLOR_FORCE'] = '1'
                 os.environ['PYTHONIOENCODING'] = 'utf-8'
-                
+
                 # Change to working directory
                 os.chdir(cwd)
-                
-                # Execute shell command
-                os.execv('/bin/zsh', ['/bin/zsh', '-c', command])
+
+                # Execute shell command with detected shell
+                os.execv(shell, shell_args)
             
             else:  # Parent process
                 self.master_fd = fd
@@ -95,13 +113,13 @@ class TerminalBridge(QObject):
                 if r:
                     data = os.read(self.master_fd, 4096)
                     if data:
-                        # Update last output time and reset inactivity flag
+                        # Update last output time
                         self.last_output_time = time.time()
-                        self._activity_seen = True
-                        if self.tracking_enabled:
-                            # First output after submit: start timing window
-                            self._awaiting_output = False
-                            self.inactivity_triggered = False
+
+                        # Update state on first output after submit
+                        if self.state == TerminalState.AWAITING_OUTPUT:
+                            self.state = TerminalState.TRACKING
+
                         # Indicate activity (output)
                         self.activity.emit()
                         # Emit base64 to preserve bytes and escape sequences
@@ -114,40 +132,34 @@ class TerminalBridge(QObject):
     
     def _check_inactivity(self):
         """Check if there's been no output for the timeout after a submit."""
-        if not self.tracking_enabled:
+        # Only check when tracking
+        if self.state != TerminalState.TRACKING:
             return
-        # Don't consider inactivity until after we see first output post-submit
-        if self._awaiting_output:
+
+        now = time.time()
+
+        # If the user is still interacting with the terminal (typing, navigation
+        # keys, etc.), treat that as activity and defer inactivity notification.
+        if self.last_input_time and (now - self.last_input_time) < INACTIVITY_TIMER:
             return
-        if not self.inactivity_triggered and self._activity_seen:
-            now = time.time()
 
-            # If the user is still interacting with the terminal (typing, navigation
-            # keys, etc.), treat that as activity and defer inactivity notification.
-            if self.last_input_time and (now - self.last_input_time) < INACTIVITY_TIMER:
-                return
-
-            # Only consider last output time once we're outside the interaction window
-            if self.last_output_time and (now - self.last_output_time) >= INACTIVITY_TIMER:
-                self.inactivity_triggered = True
-                # Stop checking until the next explicit submit (Enter)
-                # This ensures we only notify once per user-submitted request.
-                self.tracking_enabled = False
-                self.inactivity_detected.emit()
+        # Check if output has been inactive for the threshold
+        if self.last_output_time and (now - self.last_output_time) >= INACTIVITY_TIMER:
+            self.state = TerminalState.TRIGGERED
+            self.inactivity_detected.emit()
     
     @Slot(str)
     def write_to_pty(self, data):
         """Write data to PTY."""
-        # Mark input activity for UI, but don't reset inactivity timer on input
+        # Mark input activity
         self.last_input_time = time.time()
-        self._activity_seen = True
+
         # If user submitted (pressed Enter), arm tracking for this request
         if '\r' in data:
-            self.tracking_enabled = True
-            self._awaiting_output = True
-            self.inactivity_triggered = False
+            self.state = TerminalState.AWAITING_OUTPUT
             # Clear last_output_time so we only start timing after first output
             self.last_output_time = None
+
         # Indicate activity (input)
         self.activity.emit()
 
@@ -160,13 +172,10 @@ class TerminalBridge(QObject):
     def enable_tracking(self):
         """Arm inactivity tracking from now on."""
         # Keep available for manual arming, but prefer Enter-based arming.
-        self.tracking_enabled = True
-        now = time.time()
-        self.last_input_time = now
+        self.state = TerminalState.AWAITING_OUTPUT
+        self.last_input_time = time.time()
         # Defer timing until first output to avoid false positives
         self.last_output_time = None
-        self._awaiting_output = True
-        self.inactivity_triggered = False
     
     @Slot(int, int)
     def resize_pty(self, cols, rows):

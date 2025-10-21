@@ -1,8 +1,19 @@
 [project]
 name = "multi-claude-coding"
 version = "0.1.0"
-description = "Add your description here"
+description = "Cross-platform Git worktree manager with integrated terminal UI"
 requires-python = ">=3.11"
 dependencies = [
     "pyside6>=6.9.1",
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
