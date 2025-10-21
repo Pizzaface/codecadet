@@ -28,16 +28,16 @@ jobs:
       run: uv python install 3.11
 
     - name: Install dependencies
-      run: uv sync
+      run: uv pip install --system pyside6>=6.9.1
 
     - name: Test platform_utils import
-      run: uv run python -c "from platform_utils import Platform, Shell, TerminalLauncher; print('✓ Imports OK')"
+      run: python -c "from platform_utils import Platform, Shell, TerminalLauncher; print('✓ Imports OK')"
 
     - name: Test platform detection
-      run: uv run python -c "from platform_utils import Platform; print(f'Platform: Windows={Platform.is_windows()}, macOS={Platform.is_macos()}, Linux={Platform.is_linux()}')"
+      run: python -c "from platform_utils import Platform; print(f'Platform: Windows={Platform.is_windows()}, macOS={Platform.is_macos()}, Linux={Platform.is_linux()}')"
 
     - name: Test shell detection
-      run: uv run python -c "from platform_utils import Shell; shell = Shell.get_user_shell(); print(f'✓ Detected shell: {shell}')"
+      run: python -c "from platform_utils import Shell; shell = Shell.get_user_shell(); print(f'✓ Detected shell: {shell}')"
 
     - name: Verify shell args
-      run: uv run python -c "from platform_utils import Shell; args = Shell.get_shell_args(Shell.get_user_shell(), 'echo test'); print(f'✓ Shell args: {args}')"
+      run: python -c "from platform_utils import Shell; args = Shell.get_shell_args(Shell.get_user_shell(), 'echo test'); print(f'✓ Shell args: {args}')"

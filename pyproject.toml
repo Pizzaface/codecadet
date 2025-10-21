@@ -1,5 +1,5 @@
 [project]
-name = "multi-claude-coding"
+name = "codecadet"
 version = "0.1.0"
 description = "Cross-platform Git worktree manager with integrated terminal UI"
 requires-python = ">=3.11"
@@ -13,7 +13,3 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
