@@ -118,7 +118,7 @@ class TerminalLauncher:
             "--workdir", str(cwd), "-e", "bash", "-lc", f"{cmd}; exec bash"
         ] if cmd else ["--workdir", str(cwd)]),
         ("xfce4-terminal", lambda cwd, cmd: [
-            "--working-directory", str(cwd), "-e", f"bash -lc '{cmd}; exec bash'"
+            "--working-directory", str(cwd), "-e", "bash", "-lc", f"{cmd}; exec bash"
         ] if cmd else ["--working-directory", str(cwd)]),
         ("alacritty", lambda cwd, cmd: [
             "--working-directory", str(cwd), "-e", "bash", "-lc", f"{cmd}; exec bash"

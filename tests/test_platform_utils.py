@@ -178,6 +178,37 @@ class TestTerminalLauncher:
                     assert result is True
                     mock_popen.assert_called_once()
 
+    def test_launch_with_quoted_command(self):
+        """Test launching terminal with a command containing single quotes."""
+        # This is a regression test for the xfce4-terminal quote escaping bug
+        command_with_quotes = "echo 'hello world' && echo \"test's output\""
+
+        with patch('sys.platform', 'linux'):
+            # Mock shutil.which to only return xfce4-terminal
+            def which_side_effect(cmd):
+                if cmd == 'xfce4-terminal':
+                    return '/usr/bin/xfce4-terminal'
+                return None
+
+            with patch('shutil.which', side_effect=which_side_effect):
+                with patch('subprocess.Popen') as mock_popen:
+                    result = TerminalLauncher.launch(Path('/test/path'), command_with_quotes)
+                    assert result is True
+                    mock_popen.assert_called_once()
+
+                    # Verify the arguments don't have broken quoting
+                    call_args = mock_popen.call_args[0][0]
+                    # Should have separate arguments: [terminal, "--working-directory", path, "-e", "bash", "-lc", command]
+                    assert len(call_args) == 7
+                    assert call_args[0] == '/usr/bin/xfce4-terminal'
+                    assert call_args[1] == "--working-directory"
+                    assert call_args[3] == "-e"
+                    assert call_args[4] == "bash"
+                    assert call_args[5] == "-lc"
+                    # The command should be a separate argument (call_args[6])
+                    # and should contain the original quotes intact
+                    assert command_with_quotes in call_args[6]
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
