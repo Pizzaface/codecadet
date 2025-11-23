@@ -70,7 +70,6 @@ class App(QMainWindow):
         self._setup_ui()
         self._apply_theme(self.cfg.get("theme", "dark"))
         self._setup_menus()
-        self._setup_shortcuts()
         self._populate_agent_combo()
         
         # Notification sound (shared across app)
@@ -261,15 +260,15 @@ class App(QMainWindow):
             selected = self.sidebar.get_selected_worktree()
             if not selected or selected != path:
                 self.sidebar.set_attention_for_path(path, True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to notify inactivity for {path}: {e}")
 
     def notify_activity(self, path: Path):
         """Called when a session shows activity; clears the sidebar indicator."""
         try:
             self.sidebar.set_attention_for_path(path, False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to notify activity for {path}: {e}")
     
     def _setup_menus(self):
         """Setup the menu bar."""
@@ -326,17 +325,7 @@ class App(QMainWindow):
         about_action = QAction("About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
-    
-    def _setup_shortcuts(self):
-        """Setup keyboard shortcuts."""
-        # These are in addition to menu shortcuts
-        create_shortcut = QKeySequence("Ctrl+N")
-        refresh_shortcut = QKeySequence("Ctrl+R")
-        
-        # Note: Menu actions already have their shortcuts, these are additional
-        self.create_worktree  # Will be triggered by menu action
-        self.refresh  # Will be triggered by menu action
-    
+
     def _rebuild_recent_menu(self):
         """Rebuild the recent repositories menu."""
         self.recent_menu.clear()
@@ -468,7 +457,8 @@ class App(QMainWindow):
             return []
         try:
             return list_branches(self.repo_root)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to list branches: {e}")
             return []
 
     def _on_sidebar_select(self, worktree_info: WorktreeInfo):
@@ -489,8 +479,8 @@ class App(QMainWindow):
             try:
                 self.repo_root = ensure_repo_root(Path(val))
                 return self.repo_root
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Invalid repository path '{val}': {e}")
         QMessageBox.critical(self, "Select a repository", "Please choose a Git repository.")
         return None
 
@@ -680,7 +670,7 @@ class App(QMainWindow):
         # Clean up all terminal sessions
         try:
             self.term.cleanup_all_sessions()
-        except Exception:
-            pass
-        
+        except Exception as e:
+            logger.error(f"Failed to cleanup terminal sessions on close: {e}")
+
         event.accept()
