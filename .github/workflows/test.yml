@@ -1,0 +1,101 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master, develop, claude/** ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install system dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libxcb-xinerama0 \
+          libxcb-icccm4 \
+          libxcb-image0 \
+          libxcb-keysyms1 \
+          libxcb-randr0 \
+          libxcb-render-util0 \
+          libxcb-shape0 \
+          libxkbcommon-x11-0 \
+          libgl1-mesa-glx \
+          xvfb
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt || echo "No requirements.txt found"
+        pip install PySide6 || echo "PySide6 already installed"
+
+    - name: Run tests (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        xvfb-run -a python -m unittest discover tests -v
+
+    - name: Run tests (macOS/Windows)
+      if: runner.os != 'Linux'
+      run: |
+        python -m unittest discover tests -v
+
+    - name: Display test summary
+      if: always()
+      run: |
+        echo "Tests completed on ${{ matrix.os }} with Python ${{ matrix.python-version }}"
+
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint
+
+    - name: Run flake8
+      continue-on-error: true
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run pylint on new modules
+      continue-on-error: true
+      run: |
+        pylint --rcfile=.pylintrc \
+          constants.py \
+          logger.py \
+          utils.py \
+          terminal_command_builder.py \
+          ui/theme.py \
+          || echo "Pylint completed with warnings"
