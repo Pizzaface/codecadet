@@ -55,6 +55,13 @@ class TestSetupLogger(unittest.TestCase):
 class TestSetupFileLogger(unittest.TestCase):
     """Test setup_file_logger function."""
 
+    def _close_logger_handlers(self, logger):
+        """Close all handlers for a logger to prevent file locks on Windows."""
+        handlers = logger.handlers[:]
+        for handler in handlers:
+            handler.close()
+            logger.removeHandler(handler)
+
     def test_setup_file_logger_basic(self):
         """Test basic file logger setup."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -63,6 +70,9 @@ class TestSetupFileLogger(unittest.TestCase):
 
             self.assertIsInstance(logger, logging.Logger)
             self.assertEqual(logger.name, 'test_file_logger')
+
+            # Close handlers before cleanup
+            self._close_logger_handlers(logger)
 
     def test_file_logger_creates_file(self):
         """Test that file logger creates the log file."""
@@ -76,6 +86,9 @@ class TestSetupFileLogger(unittest.TestCase):
             # File should exist
             self.assertTrue(log_file.exists())
 
+            # Close handlers before cleanup
+            self._close_logger_handlers(logger)
+
     def test_file_logger_has_multiple_handlers(self):
         """Test that file logger has both console and file handlers."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -84,6 +97,9 @@ class TestSetupFileLogger(unittest.TestCase):
 
             # Should have at least 2 handlers (console + file)
             self.assertGreaterEqual(len(logger.handlers), 2)
+
+            # Close handlers before cleanup
+            self._close_logger_handlers(logger)
 
     def test_file_logger_default_path(self):
         """Test file logger with default path."""
@@ -129,6 +145,13 @@ class TestGetLogger(unittest.TestCase):
 class TestLoggerFunctionality(unittest.TestCase):
     """Test logger functionality."""
 
+    def _close_logger_handlers(self, logger):
+        """Close all handlers for a logger to prevent file locks on Windows."""
+        handlers = logger.handlers[:]
+        for handler in handlers:
+            handler.close()
+            logger.removeHandler(handler)
+
     def test_logger_can_log_messages(self):
         """Test that logger can log messages."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -138,6 +161,9 @@ class TestLoggerFunctionality(unittest.TestCase):
             logger.info('Test info message')
             logger.warning('Test warning message')
             logger.error('Test error message')
+
+            # Close handlers to flush and release file
+            self._close_logger_handlers(logger)
 
             # Read log file
             content = log_file.read_text()
@@ -157,6 +183,9 @@ class TestLoggerFunctionality(unittest.TestCase):
             logger.warning('Warning message')
             logger.error('Error message')
 
+            # Close handlers to flush and release file
+            self._close_logger_handlers(logger)
+
             # Read log file
             content = log_file.read_text()
 
@@ -175,6 +204,9 @@ class TestLoggerFunctionality(unittest.TestCase):
             logger = setup_file_logger('test_logger_format', log_file)
 
             logger.info('Test message')
+
+            # Close handlers to flush and release file
+            self._close_logger_handlers(logger)
 
             # Read log file
             content = log_file.read_text()

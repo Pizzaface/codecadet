@@ -70,9 +70,9 @@ class TestMacOSTerminalIntegration(unittest.TestCase):
         self.builder.set_app_venv_bin(self.venv_path)
         snippet = self.builder._build_path_cleanup_snippet()
 
-        # Should contain the venv path
-        self.assertIn(str(self.venv_path), snippet)
+        # Should contain APP_VENV_BIN variable (path will be escaped)
         self.assertIn('APP_VENV_BIN', snippet)
+        self.assertIn('APP_VENV_BIN=', snippet)
 
         # Should use awk for PATH manipulation
         self.assertIn('awk', snippet)

@@ -77,10 +77,10 @@ class MockTerminalProcess:
 
 
 def remove_path_entry(path_value: str, entry: str) -> str:
-    """Remove all occurrences of an entry from a PATH-like string.
+    """Remove all occurrences of an entry from a Unix PATH-like string.
 
     Args:
-        path_value: PATH environment variable value
+        path_value: PATH environment variable value (Unix-style, colon-separated)
         entry: Entry to remove
 
     Returns:
@@ -89,11 +89,16 @@ def remove_path_entry(path_value: str, entry: str) -> str:
     Example:
         >>> remove_path_entry("/usr/bin:/tmp:/usr/local/bin", "/tmp")
         '/usr/bin:/usr/local/bin'
+
+    Note:
+        This function always uses ':' as separator for Unix shell compatibility,
+        regardless of the platform it runs on.
     """
     if not path_value or not entry:
         return path_value
 
-    sep = os.pathsep
+    # Always use ':' for Unix shell PATH variables
+    sep = ':'
     parts = path_value.split(sep)
     cleaned = [part for part in parts if part != entry]
     return sep.join(cleaned)
