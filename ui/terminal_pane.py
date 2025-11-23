@@ -289,6 +289,8 @@ class TerminalPane(QWidget):
             self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
         else:
             # Linux: Use xterm embedding
+            # Pass venv_bin_dir as string for PATH cleanup in subprocess environment
+            app_venv_bin_str = str(venv_bin_dir)
             self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
 
     def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
