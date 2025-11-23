@@ -1,10 +1,14 @@
 # Core dependencies
 PySide6>=6.5.0
-PySide6-WebEngine>=6.5.0
 
 # Testing dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0
+
+# Optional dependencies (not required for tests)
+# Install separately if needed:
+# pip install PySide6-Addons
+# This includes WebEngine and other Qt modules
 
 # Development dependencies (optional)
 # Uncomment below for development
