@@ -2,35 +2,36 @@
 
 import os
 import sys
-import shlex
 import subprocess
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QMessageBox
 )
 
 from git_utils import which
 from terminal import launch_claude_in_terminal, launch_terminal_only
+from constants import (
+    TERMINAL_CHAR_WIDTH, TERMINAL_CHAR_HEIGHT, TERMINAL_MIN_COLS,
+    TERMINAL_MIN_ROWS, TERMINAL_CONTAINER_PADDING, STATUS_NO_SESSION,
+    BUTTON_PREFIX_RUN, BUTTON_PREFIX_EXTERNAL, BUTTON_PREFIX_STOP,
+    ENV_VAR_VIRTUAL_ENV, ENV_VAR_POETRY_ACTIVE, ENV_VAR_PATH
+)
+from utils import MockTerminalProcess, remove_path_entry
+from terminal_command_builder import TerminalCommandBuilder
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TerminalPane(QWidget):
-    """
-    Multi-session terminal pane that maintains separate xterm sessions for each worktree.
-    Shows/hides the appropriate session when switching worktrees.
-    """
+    """Multi-session terminal pane that maintains separate terminal sessions for each worktree.
 
-    @staticmethod
-    def _remove_path_entry(path_value: str, entry: str) -> str:
-        """Remove all occurrences of `entry` from a PATH-like string."""
-        if not path_value or not entry:
-            return path_value
-        sep = os.pathsep
-        parts = path_value.split(sep)
-        cleaned = [part for part in parts if part != entry]
-        return sep.join(cleaned)
+    Shows/hides the appropriate session when switching worktrees.
+    Supports both PTY (macOS) and xterm (Linux) terminal implementations.
+    """
 
     def __init__(self, parent, get_selected_cwd, claude_cmd_getter, config_getter=None):
         super().__init__(parent)
@@ -42,6 +43,9 @@ class TerminalPane(QWidget):
 
         # Get session manager from the App instance
         self.session_manager = None  # Will be set by App
+
+        # Terminal command builder
+        self.command_builder = TerminalCommandBuilder()
 
         self._setup_ui()
         self._apply_dark_theme()
@@ -90,19 +94,19 @@ class TerminalPane(QWidget):
         
         # Control bar
         control_layout = QHBoxLayout()
-        
-        self.run_claude_btn = QPushButton("▶ Run Claude here")
+
+        self.run_claude_btn = QPushButton(f"{BUTTON_PREFIX_RUN} Run Claude here")
         self.run_claude_btn.clicked.connect(self.run_claude_here)
         control_layout.addWidget(self.run_claude_btn)
         self.update_run_button_text()
-        
-        external_btn = QPushButton("□ Open External Terminal")
+
+        external_btn = QPushButton(f"{BUTTON_PREFIX_EXTERNAL} Open External Terminal")
         external_btn.clicked.connect(self.open_external)
         control_layout.addWidget(external_btn)
-        
+
         control_layout.addStretch()
-        
-        stop_btn = QPushButton("⛔ Stop")
+
+        stop_btn = QPushButton(f"{BUTTON_PREFIX_STOP} Stop")
         stop_btn.clicked.connect(self.stop_current)
         control_layout.addWidget(stop_btn)
         
@@ -154,11 +158,11 @@ class TerminalPane(QWidget):
             agent_config = get_agent_config(config, default_agent)
             if agent_config:
                 agent_name = agent_config.get("name", default_agent)
-                self.run_claude_btn.setText(f"▶ Run {agent_name} here")
+                self.run_claude_btn.setText(f"{BUTTON_PREFIX_RUN} Run {agent_name} here")
             else:
-                self.run_claude_btn.setText("▶ Run Claude here")
+                self.run_claude_btn.setText(f"{BUTTON_PREFIX_RUN} Run Claude here")
         else:
-            self.run_claude_btn.setText("▶ Run Claude here")
+            self.run_claude_btn.setText(f"{BUTTON_PREFIX_RUN} Run Claude here")
 
     @property
     def can_embed(self) -> bool:
@@ -187,7 +191,7 @@ class TerminalPane(QWidget):
         self.main_container_layout.addWidget(self.no_session_frame)
         self.no_session_frame.show()
         self.current_container = None
-        self.status_lbl.setText("No active session")
+        self.status_lbl.setText(STATUS_NO_SESSION)
 
     def _hide_all_containers(self):
         """Hide and remove all child widgets from the main container."""
@@ -251,98 +255,33 @@ class TerminalPane(QWidget):
         # Ensure the container is properly sized and visible
         container.updateGeometry()
         
-        # Get the native window ID for embedding
+        # Get the native window ID for embedding (for xterm)
         wid = container.winId()
 
-        # Calculate appropriate geometry
+        # Calculate geometry using constants
         container_width = container.width() if container.width() > 0 else 800
         container_height = container.height() if container.height() > 0 else 600
-        char_width = 7
-        char_height = 14
-        cols = max(40, (container_width - 20) // char_width)
-        rows = max(10, (container_height - 20) // char_height)
-        geometry = f"{cols}x{rows}"
 
+        geometry = self.command_builder.build_geometry_string(
+            container_width,
+            container_height,
+            TERMINAL_CHAR_WIDTH,
+            TERMINAL_CHAR_HEIGHT,
+            TERMINAL_CONTAINER_PADDING,
+            TERMINAL_MIN_COLS,
+            TERMINAL_MIN_ROWS
+        )
+
+        # Get agent command
         claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
 
-        # Command that starts in the worktree directory with common developer environments available
-        # We explicitly preserve PATH and source appropriate profile files for user tools
-        # Properly escape the PATH to handle spaces and special characters
-        # Current PATH is not used directly; we rely on sourced profiles' PATH and append common paths.
-        # Common developer tool paths that may not be present depending on how the app was launched
-        # (Finder-launched apps often inherit a minimal PATH on macOS)
-        additional_paths = ":".join([
-            "$HOME/.local/bin",
-            "$HOME/.poetry/bin",
-            "$HOME/.pyenv/bin",
-            "$HOME/.pyenv/shims",
-            "$HOME/.asdf/bin",
-            "$HOME/.asdf/shims",
-            "$HOME/.rtx/bin",
-            "$HOME/.deno/bin",
-            "$HOME/.cargo/bin",
-            "/opt/homebrew/bin",
-            "/opt/homebrew/sbin",
-            "/usr/local/bin",
-            "/usr/local/sbin",
-        ])
-
+        # Set up the command builder with app venv path to exclude
         app_dir = Path(__file__).parent.parent
         venv_bin_dir = app_dir / ".venv" / ("Scripts" if sys.platform.startswith("win") else "bin")
-        app_venv_bin_str = os.fspath(venv_bin_dir)
+        self.command_builder.set_app_venv_bin(venv_bin_dir)
 
-        path_cleanup_snippet = ""
-        if not sys.platform.startswith("win") and app_venv_bin_str:
-            escaped_app_venv_bin = (
-                app_venv_bin_str
-                .replace("\\", "\\\\")
-                .replace('"', '\\"')
-                .replace("$", "\\$")
-            )
-            path_cleanup_snippet = (
-                f'APP_VENV_BIN="{escaped_app_venv_bin}"; '
-                'PATH="$(printf \'%s\' "$PATH" | awk -v RS=: -v ORS=: -v target="$APP_VENV_BIN" \'$0 != target\')"; '
-                'PATH="${PATH%:}"; '
-                'unset APP_VENV_BIN; '
-            )
-
-        path_append_snippet = (
-            f'PATH_EXTRAS="{additional_paths}"; '
-            'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
-            'unset PATH_EXTRAS; '
-        )
-        
-        # Choose appropriate shell and profile based on platform
-        if sys.platform == "darwin":
-            shell_cmd = "zsh"
-            # Source all relevant zsh and profile files if present, then ensure Homebrew env if available.
-            profile_source = (
-                "for f in /etc/zshenv /etc/zprofile /etc/profile ~/.zshenv ~/.zprofile ~/.profile ~/.zshrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done; "
-                "eval \"$('/opt/homebrew/bin/brew' shellenv)\" 2>/dev/null || "
-                "eval \"$('/usr/local/bin/brew' shellenv)\" 2>/dev/null || true"
-            )
-        else:
-            shell_cmd = "bash"
-            # Source common bash profile files on Linux; cover login and non-login shells.
-            profile_source = (
-                "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done"
-            )
-        
-        bash_command = (
-            f'{path_cleanup_snippet}'
-            f'{profile_source}; '  # Source user/system profiles for environment setup
-            f'{path_cleanup_snippet}'
-            f'{path_append_snippet}'  # Extend PATH with common tool locations, preserving profile changes
-            f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
-            f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
-            f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
-            f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
-            f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
-            f'cd {shlex.quote(str(cwd))}; '
-            f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
-        )
+        # Build bash command using the builder
+        bash_command = self.command_builder.build_agent_launch_command(cwd, claude_cmd)
 
         # Platform-specific terminal implementation
         if sys.platform == "darwin":
@@ -365,37 +304,18 @@ class TerminalPane(QWidget):
                 try:
                     terminal_widget.inactivity_for_worktree.connect(self._on_session_inactivity)
                     terminal_widget.activity_for_worktree.connect(self._on_session_activity)
-                except Exception:
-                    pass
-                
+                except Exception as e:
+                    logger.debug(f"Could not connect inactivity signals: {e}")
+
                 # Add to container layout
                 layout = QVBoxLayout(container)
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.addWidget(terminal_widget)
-                
-                # Create a mock process object for compatibility with session manager
-                class MockProcess:
-                    def __init__(self, widget):
-                        self.widget = widget
-                        
-                    def poll(self):
-                        # Check if process is still running via bridge
-                        if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
-                            try:
-                                os.kill(self.widget.bridge.process_pid, 0)
-                                return None  # Still running
-                            except OSError:
-                                return 0  # Process ended
-                        return 0
-                        
-                    def terminate(self):
-                        if hasattr(self.widget, 'cleanup'):
-                            self.widget.cleanup()
-                
+
                 # Register this session with mock process
                 self.session_manager.register_session(
                     worktree_path=cwd,
-                    process=MockProcess(terminal_widget),
+                    process=MockTerminalProcess(terminal_widget),
                     container_frame=container,
                     command=claude_cmd
                 )
@@ -406,52 +326,35 @@ class TerminalPane(QWidget):
             except ImportError:
                 # Fall back to original PTY terminal
                 from .pty_terminal import PTYTerminalWidget
-                
+
                 # Create PTY terminal widget
                 terminal_widget = PTYTerminalWidget(container, bash_command, str(cwd))
-                
+
                 # Add to container layout
                 layout = QVBoxLayout(container)
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.addWidget(terminal_widget)
-                
-                # Create a mock process object for compatibility with session manager
-                class MockProcess:
-                    def __init__(self, widget):
-                        self.widget = widget
-                        
-                    def poll(self):
-                        # Check if process is still running
-                        if hasattr(self.widget, 'process_pid'):
-                            try:
-                                os.kill(self.widget.process_pid, 0)
-                                return None  # Still running
-                            except OSError:
-                                return 0  # Process ended
-                        return 0
-                        
-                    def terminate(self):
-                        if hasattr(self.widget, '_cleanup'):
-                            self.widget._cleanup()
-                
+
                 # Register this session with mock process
                 self.session_manager.register_session(
                     worktree_path=cwd,
-                    process=MockProcess(terminal_widget),
+                    process=MockTerminalProcess(terminal_widget),
                     container_frame=container,
                     command=claude_cmd
                 )
-                
+
                 self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
             
         except ImportError as e:
             # Fallback to external terminal if no terminal widget available
+            logger.info(f"Embedded terminal not available: {e}, falling back to external terminal")
             QMessageBox.information(self, "Terminal", f"Embedded terminal not available: {e}. Opening external terminal.")
             self.open_external()
             container.setParent(None)
             container.deleteLater()
             self._show_no_session()
         except Exception as e:
+            logger.error(f"Failed to start embedded terminal: {e}", exc_info=True)
             QMessageBox.critical(self, "Failed to start embedded terminal", str(e))
             container.setParent(None)
             container.deleteLater()
@@ -484,22 +387,22 @@ class TerminalPane(QWidget):
             # Clear ONLY the virtual environment variables that would confuse Poetry
             # about which project to use, but keep PATH intact
             app_dir = Path(__file__).parent.parent
-            if 'VIRTUAL_ENV' in env:
-                venv_path = env.get('VIRTUAL_ENV', '')
+            if ENV_VAR_VIRTUAL_ENV in env:
+                venv_path = env.get(ENV_VAR_VIRTUAL_ENV, '')
                 if str(app_dir) in venv_path:
                     # This is the Worktree Manager's venv, clear it
-                    env.pop('VIRTUAL_ENV', None)
-                    env.pop('POETRY_ACTIVE', None)
+                    env.pop(ENV_VAR_VIRTUAL_ENV, None)
+                    env.pop(ENV_VAR_POETRY_ACTIVE, None)
                     # But do NOT modify PATH - Poetry binary should still be accessible
 
             if app_venv_bin:
-                env_path = env.get('PATH')
+                env_path = env.get(ENV_VAR_PATH)
                 if env_path:
-                    cleaned_path = self._remove_path_entry(env_path, app_venv_bin)
+                    cleaned_path = remove_path_entry(env_path, app_venv_bin)
                     if cleaned_path:
-                        env['PATH'] = cleaned_path
+                        env[ENV_VAR_PATH] = cleaned_path
                     else:
-                        env['PATH'] = os.defpath
+                        env[ENV_VAR_PATH] = os.defpath
 
             # Using cwd parameter ensures the process starts in the worktree directory
             proc = subprocess.Popen(cmdline, cwd=str(cwd), env=env)
@@ -515,6 +418,7 @@ class TerminalPane(QWidget):
             self.status_lbl.setText(f"Started new session: {cwd.name}")
 
         except Exception as e:
+            logger.error(f"Failed to start xterm terminal: {e}", exc_info=True)
             QMessageBox.critical(self, "Failed to start embedded terminal", str(e))
             container.setParent(None)
             container.deleteLater()

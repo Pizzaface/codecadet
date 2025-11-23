@@ -25,6 +25,18 @@ from .tooltip import add_tooltip, add_tooltip_to_button, StatusTooltip
 from .dialogs import CreateDialog
 from .sidebar import SimpleWorktreeSidebar
 from .terminal_pane import TerminalPane
+from .theme import ThemeManager
+from constants import (
+    APP_TITLE, APP_ABOUT_TEXT, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, SIDEBAR_INITIAL_WIDTH,
+    TERMINAL_PANE_INITIAL_WIDTH, NOTIFICATION_SOUND_RATE_LIMIT_SECONDS,
+    NOTIFICATION_SOUND_VOLUME, STATUS_READY, ICON_FOLDER, ICON_FILE,
+    ICON_SUCCESS, ICON_DELETE, ICON_CLEAN, ICON_SETTINGS, ICON_ROBOT
+)
+from utils import parse_geometry_string, format_geometry_string
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class App(QMainWindow):
@@ -32,9 +44,9 @@ class App(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Git Worktree Manager for Claude Code")
-        self.resize(1000, 600)
-        self.setMinimumSize(880, 520)
+        self.setWindowTitle(APP_TITLE)
+        self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        self.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         
         # Set window icon
         icon_path = Path(__file__).parent.parent / "assets" / "icon.png"
@@ -51,6 +63,9 @@ class App(QMainWindow):
         # Session manager (must be created before TerminalPane)
         self.session_manager = SessionManager()
 
+        # Theme manager
+        self.theme_manager = ThemeManager()
+
         # Setup UI
         self._setup_ui()
         self._apply_theme(self.cfg.get("theme", "dark"))
@@ -64,7 +79,7 @@ class App(QMainWindow):
         sound_path = Path(__file__).parent.parent / "assets" / "done.wav"
         if sound_path.exists():
             self._notif_sound.setSource(QUrl.fromLocalFile(str(sound_path)))
-            self._notif_sound.setVolume(0.5)
+            self._notif_sound.setVolume(NOTIFICATION_SOUND_VOLUME)
         
         # Initial Git check
         if not git_version_ok():
@@ -159,7 +174,7 @@ class App(QMainWindow):
         self.term.update_run_button_text()
         
         # Set splitter proportions
-        splitter.setSizes([400, 600])
+        splitter.setSizes([SIDEBAR_INITIAL_WIDTH, TERMINAL_PANE_INITIAL_WIDTH])
         main_layout.addWidget(splitter, 1)  # stretch factor 1
         
         # Bottom action bar
@@ -211,7 +226,7 @@ class App(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         
-        status_label = QLabel("Ready")
+        status_label = QLabel(STATUS_READY)
         status_label.setStyleSheet("color: #9aa1b2; padding: 6px 12px;")
         self.status_bar.addWidget(status_label)
         self.status_label = status_label
@@ -221,16 +236,17 @@ class App(QMainWindow):
         
         
     def _play_notification_sound(self):
+        """Play notification sound with rate limiting."""
         try:
             if self._notif_sound and self._notif_sound.source():
                 import time
                 now = time.time()
                 # Rate-limit to avoid rapid repeats
-                if (now - self._last_sound_time) >= 4.0:
+                if (now - self._last_sound_time) >= NOTIFICATION_SOUND_RATE_LIMIT_SECONDS:
                     self._notif_sound.play()
                     self._last_sound_time = now
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to play notification sound: {e}")
 
     def notify_inactivity(self, path: Path):
         """Called when a background terminal session becomes inactive.
@@ -342,246 +358,23 @@ class App(QMainWindow):
         self.recent_menu.addAction(clear_action)
     
     def _apply_theme(self, mode: str = "dark"):
-        """Apply theme styling."""
-        if mode == "dark":
-            # Dark theme colors
-            bg = "#0f1115"
-            panel = "#151823"
-            surface = "#1a1f2e"
-            text = "#e6e7ee"
-            subtext = "#9aa1b2"
-            accent = "#7c7fff"
-            sel_bg = "#26304a"
-            hover = "#20273a"
-            
-            style = f"""
-                QMainWindow {{
-                    background-color: {bg};
-                    color: {text};
-                }}
-                QWidget {{
-                    background-color: {bg};
-                    color: {text};
-                }}
-                QLabel {{
-                    color: {text};
-                    background-color: transparent;
-                }}
-                QPushButton {{
-                    background-color: {surface};
-                    color: {text};
-                    border: 1px solid #404757;
-                    border-radius: 4px;
-                    padding: 8px 12px;
-                    font-size: 11px;
-                }}
-                QPushButton:hover {{
-                    background-color: {hover};
-                }}
-                QPushButton:pressed {{
-                    background-color: {sel_bg};
-                }}
-                QComboBox {{
-                    background-color: {panel};
-                    color: {text};
-                    border: 1px solid #404757;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-size: 11px;
-                }}
-                QComboBox:focus {{
-                    border: 2px solid {accent};
-                }}
-                QComboBox::drop-down {{
-                    border: none;
-                    background-color: {surface};
-                }}
-                QComboBox QAbstractItemView {{
-                    background-color: {panel};
-                    color: {text};
-                    selection-background-color: {accent};
-                    border: 1px solid #404757;
-                }}
-                QCheckBox {{
-                    color: {text};
-                    background-color: transparent;
-                }}
-                QCheckBox::indicator {{
-                    width: 16px;
-                    height: 16px;
-                    background-color: {panel};
-                    border: 1px solid #404757;
-                    border-radius: 3px;
-                }}
-                QCheckBox::indicator:checked {{
-                    background-color: {accent};
-                    border-color: {accent};
-                }}
-                QStatusBar {{
-                    background-color: {surface};
-                    color: {subtext};
-                    border-top: 1px solid #404757;
-                }}
-                QMenuBar {{
-                    background-color: {bg};
-                    color: {text};
-                    border-bottom: 1px solid #404757;
-                }}
-                QMenuBar::item {{
-                    background-color: transparent;
-                    padding: 4px 8px;
-                }}
-                QMenuBar::item:selected {{
-                    background-color: {hover};
-                }}
-                QMenu {{
-                    background-color: {panel};
-                    color: {text};
-                    border: 1px solid #404757;
-                }}
-                QMenu::item {{
-                    padding: 6px 20px;
-                }}
-                QMenu::item:selected {{
-                    background-color: {accent};
-                    color: #ffffff;
-                }}
-                QMenu::separator {{
-                    height: 1px;
-                    background-color: #404757;
-                    margin: 2px 0;
-                }}
-                QSplitter::handle {{
-                    background-color: #404757;
-                    width: 2px;
-                    height: 2px;
-                }}
-                QSplitter::handle:hover {{
-                    background-color: {accent};
-                }}
-            """
-        else:
-            # Light theme colors
-            bg = "#f5f6fb"
-            panel = "#ffffff"
-            surface = "#f0f2f7"
-            text = "#0e1116"
-            subtext = "#475569"
-            accent = "#4f46e5"
-            sel_bg = "#e5e7f9"
-            hover = "#eceffe"
-            
-            style = f"""
-                QMainWindow {{
-                    background-color: {bg};
-                    color: {text};
-                }}
-                QWidget {{
-                    background-color: {bg};
-                    color: {text};
-                }}
-                QLabel {{
-                    color: {text};
-                    background-color: transparent;
-                }}
-                QPushButton {{
-                    background-color: {surface};
-                    color: {text};
-                    border: 1px solid #d1d5db;
-                    border-radius: 4px;
-                    padding: 8px 12px;
-                    font-size: 11px;
-                }}
-                QPushButton:hover {{
-                    background-color: {hover};
-                }}
-                QPushButton:pressed {{
-                    background-color: {sel_bg};
-                }}
-                QComboBox {{
-                    background-color: {panel};
-                    color: {text};
-                    border: 1px solid #d1d5db;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-size: 11px;
-                }}
-                QComboBox:focus {{
-                    border: 2px solid {accent};
-                }}
-                QComboBox::drop-down {{
-                    border: none;
-                    background-color: {surface};
-                }}
-                QComboBox QAbstractItemView {{
-                    background-color: {panel};
-                    color: {text};
-                    selection-background-color: {accent};
-                    selection-color: #ffffff;
-                    border: 1px solid #d1d5db;
-                }}
-                QCheckBox {{
-                    color: {text};
-                    background-color: transparent;
-                }}
-                QCheckBox::indicator {{
-                    width: 16px;
-                    height: 16px;
-                    background-color: {panel};
-                    border: 1px solid #d1d5db;
-                    border-radius: 3px;
-                }}
-                QCheckBox::indicator:checked {{
-                    background-color: {accent};
-                    border-color: {accent};
-                }}
-                QStatusBar {{
-                    background-color: {surface};
-                    color: {subtext};
-                    border-top: 1px solid #d1d5db;
-                }}
-                QMenuBar {{
-                    background-color: {bg};
-                    color: {text};
-                    border-bottom: 1px solid #d1d5db;
-                }}
-                QMenuBar::item {{
-                    background-color: transparent;
-                    padding: 4px 8px;
-                }}
-                QMenuBar::item:selected {{
-                    background-color: {hover};
-                }}
-                QMenu {{
-                    background-color: {panel};
-                    color: {text};
-                    border: 1px solid #d1d5db;
-                }}
-                QMenu::item {{
-                    padding: 6px 20px;
-                }}
-                QMenu::item:selected {{
-                    background-color: {accent};
-                    color: #ffffff;
-                }}
-                QMenu::separator {{
-                    height: 1px;
-                    background-color: #d1d5db;
-                    margin: 2px 0;
-                }}
-                QSplitter::handle {{
-                    background-color: #d1d5db;
-                    width: 2px;
-                    height: 2px;
-                }}
-                QSplitter::handle:hover {{
-                    background-color: {accent};
-                }}
-            """
-        
-        self.setStyleSheet(style)
-        self.cfg["theme"] = mode
-        save_config(self.cfg)
+        """Apply theme styling using the centralized ThemeManager.
+
+        Args:
+            mode: Theme mode ("dark" or "light")
+        """
+        try:
+            stylesheet = self.theme_manager.get_stylesheet(mode)
+            self.setStyleSheet(stylesheet)
+            self.theme_manager.set_current_theme(mode)
+            self.cfg["theme"] = mode
+            save_config(self.cfg)
+        except KeyError:
+            # Fallback to dark theme if invalid theme name
+            stylesheet = self.theme_manager.get_stylesheet("dark")
+            self.setStyleSheet(stylesheet)
+            self.cfg["theme"] = "dark"
+            save_config(self.cfg)
     
     def _switch_theme(self, mode: str):
         """Switch to specified theme."""
@@ -589,31 +382,20 @@ class App(QMainWindow):
     
     def _show_about(self):
         """Show about dialog."""
-        QMessageBox.about(
-            self,
-            "About",
-            "Worktree Manager for Claude Code — v2\n"
-            "• Multi-session terminal support\n"
-            "• Recents + auto‑reopen\n"
-            "• Modern dark UI\n"
-            "• Embedded terminal via xterm on Linux\n"
-            "Built with PySide6 for cross-platform compatibility."
-        )
+        QMessageBox.about(self, "About", APP_ABOUT_TEXT)
     
     def _restore_settings(self):
         """Restore window geometry and last repo."""
         geom = self.cfg.get("window_geometry")
         if geom:
             try:
-                # Parse geometry string (e.g., "1000x600+100+100")
-                if 'x' in geom and '+' in geom:
-                    size_part, pos_part = geom.split('+', 1)
-                    width, height = map(int, size_part.split('x'))
-                    x, y = map(int, pos_part.split('+'))
+                parsed = parse_geometry_string(geom)
+                if parsed:
+                    width, height, x, y = parsed
                     self.resize(width, height)
                     self.move(x, y)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to restore window geometry: {e}")
         
         if self.cfg.get("auto_reopen_last") and self.cfg.get("last_repo"):
             last = Path(self.cfg["last_repo"])
@@ -661,7 +443,7 @@ class App(QMainWindow):
         self.repo_combo.addItems(self.cfg.get("recent_repos", []))
         self.repo_combo.setCurrentText(str(repo_root))
         self._rebuild_recent_menu()
-        self._set_status(f"📂 Repository opened: {repo_root.name}")
+        self._set_status(f"{ICON_FOLDER} Repository opened: {repo_root.name}")
         self.status_tooltip.show_message(f"Repository: {repo_root}", "success")
 
     def refresh(self):
@@ -692,7 +474,7 @@ class App(QMainWindow):
     def _on_sidebar_select(self, worktree_info: WorktreeInfo):
         """Called when a worktree is selected in the sidebar."""
         branch_name = worktree_info.branch.replace("refs/heads/", "") if worktree_info.branch else "detached"
-        self._set_status(f"🗂️ Selected: {worktree_info.path.name} (branch: {branch_name})")
+        self._set_status(f"{ICON_FILE} Selected: {worktree_info.path.name} (branch: {branch_name})")
 
         # Switch terminal pane to show this worktree's session
         if self.cfg.get("embed_terminal", True) and self.term.can_embed:
@@ -731,7 +513,7 @@ class App(QMainWindow):
             try:
                 add_worktree(repo, path, branch, base)
                 self.refresh()
-                self._set_status(f"✅ Created worktree: {path.name}")
+                self._set_status(f"{ICON_SUCCESS} Created worktree: {path.name}")
                 QMessageBox.information(self, "Success", f"Created worktree at {path}")
             except Exception as e:
                 QMessageBox.critical(self, "Failed to create worktree", str(e))
@@ -767,7 +549,7 @@ class App(QMainWindow):
             # Remove the worktree
             remove_worktree(repo, wt, force=use_force)
             self.refresh()
-            self._set_status(f"🗑️ Removed worktree: {wt.name}")
+            self._set_status(f"{ICON_DELETE} Removed worktree: {wt.name}")
             QMessageBox.information(self, "Removed", f"Removed worktree at {wt}")
         except Exception as e:
             QMessageBox.critical(self, "Failed to remove", str(e))
@@ -780,7 +562,7 @@ class App(QMainWindow):
         try:
             prune_worktrees(repo)
             self.refresh()
-            self._set_status("🧹 Pruned stale worktree metadata")
+            self._set_status(f"{ICON_CLEAN} Pruned stale worktree metadata")
             QMessageBox.information(self, "Pruned", "Pruned stale worktrees metadata.")
         except Exception as e:
             QMessageBox.critical(self, "Failed to prune", str(e))
@@ -824,7 +606,7 @@ class App(QMainWindow):
         dialog = AgentConfigDialog(self, self.cfg)
         if dialog.exec() == QDialog.Accepted:
             save_config(self.cfg)
-            self._set_status("⚙️ Preferences updated")
+            self._set_status(f"{ICON_SETTINGS} Preferences updated")
             self._populate_agent_combo()  # Refresh agent list
             self.term.update_run_button_text()  # Update terminal button text
 
@@ -868,7 +650,7 @@ class App(QMainWindow):
         if index >= 0:
             agent_id = self.agent_combo.itemData(index)
             agent_name = self.agent_combo.itemText(index)
-            self._set_status(f"🤖 Selected agent: {agent_name}")
+            self._set_status(f"{ICON_ROBOT} Selected agent: {agent_name}")
             # Update terminal button if this becomes the default
             if agent_id == get_default_agent(self.cfg):
                 self.term.update_run_button_text()
@@ -882,13 +664,18 @@ class App(QMainWindow):
         try:
             # Save window geometry
             geometry = self.geometry()
-            geom_str = f"{geometry.width()}x{geometry.height()}+{geometry.x()}+{geometry.y()}"
+            geom_str = format_geometry_string(
+                geometry.width(),
+                geometry.height(),
+                geometry.x(),
+                geometry.y()
+            )
             self.cfg["window_geometry"] = geom_str
             if self.repo_root:
                 self.cfg["last_repo"] = str(self.repo_root)
             save_config(self.cfg)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to save configuration on close: {e}")
         
         # Clean up all terminal sessions
         try:
