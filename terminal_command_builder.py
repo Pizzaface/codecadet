@@ -50,7 +50,7 @@ class TerminalCommandBuilder:
         Returns:
             Bash code snippet or empty string
         """
-        if sys.platform.startswith("win") or not self._app_venv_bin:
+        if self.platform.startswith("win") or not self._app_venv_bin:
             return ""
 
         # Escape the path for safe use in bash
