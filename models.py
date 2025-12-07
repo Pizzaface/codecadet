@@ -27,3 +27,5 @@ class SessionInfo:
     status: str  # "running", "stopped", "error"
     command: str
     start_time: float
+    tab_id: str  # Unique identifier for the tab within the worktree
+    tab_name: str  # Display name for the tab

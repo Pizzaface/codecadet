@@ -6,7 +6,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QFrame, QMessageBox
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from git_utils import which
 from terminal import launch_claude_in_terminal, launch_terminal_only
+from ui.tab_bar import TabBar
 
 
 class TerminalPane(QWidget):
@@ -38,6 +39,7 @@ class TerminalPane(QWidget):
         self.get_claude_cmd = claude_cmd_getter
         self.get_config = config_getter
         self.current_worktree_path: Path | None = None
+        self.current_tab_id: str | None = None
         self.current_container: QWidget | None = None
 
         # Get session manager from the App instance
@@ -52,7 +54,15 @@ class TerminalPane(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
         
-        # Top bar
+        # Tab bar
+        self.tab_bar = TabBar()
+        self.tab_bar.tab_switched.connect(self._on_tab_switched)
+        self.tab_bar.tab_close_requested.connect(self._on_tab_close_requested)
+        self.tab_bar.tab_new_requested.connect(self._on_new_tab_requested)
+        self.tab_bar.tab_rename_requested.connect(self._on_tab_rename_requested)
+        layout.addWidget(self.tab_bar)
+        
+        # Top bar (below tabs)
         bar_layout = QHBoxLayout()
         
         title_label = QLabel("Terminal")
@@ -168,12 +178,22 @@ class TerminalPane(QWidget):
         # macOS: Check for iTerm2 first, then Terminal.app
         elif sys.platform == "darwin":
             return True
+        # Windows: Use web terminal with winpty
+        elif sys.platform.startswith("win"):
+            try:
+                from winpty import PtyProcess
+                return PtyProcess is not None
+            except ImportError as e:
+                print(f"Failed to import winpty: {e}")
+                return False
         return False
 
     def _update_embed_status(self):
         if self.can_embed:
             if sys.platform == "darwin":
                 self.status_lbl.setText("Multi-session mode (PTY)")
+            elif sys.platform.startswith("win"):
+                self.status_lbl.setText("Multi-session mode (WinPTY)")
             else:
                 self.status_lbl.setText("Multi-session mode (xterm)")
         else:
@@ -183,10 +203,13 @@ class TerminalPane(QWidget):
         """Show the 'No Session' frame."""
         # Hide all session containers
         self._hide_all_containers()
+        # Hide tab bar when showing no session
+        self.tab_bar.hide()
         # Show no session frame
         self.main_container_layout.addWidget(self.no_session_frame)
         self.no_session_frame.show()
         self.current_container = None
+        self.current_tab_id = None
         self.status_lbl.setText("No active session")
 
     def _hide_all_containers(self):
@@ -202,22 +225,34 @@ class TerminalPane(QWidget):
             return
 
         self.current_worktree_path = worktree_path
-
-        # Check if there's an active session for this worktree
-        session = self.session_manager.get_session(worktree_path)
-
-        if session and session.container_frame:
-            # Hide all containers first
-            self._hide_all_containers()
-
-            # Show this session's container
-            self.main_container_layout.addWidget(session.container_frame)
-            session.container_frame.show()
-            self.current_container = session.container_frame
-            self.status_lbl.setText(f"Active session: {worktree_path.name}")
+        
+        # Get all sessions for this worktree
+        worktree_sessions = self.session_manager.get_all_sessions_for_worktree(worktree_path)
+        
+        # Clear and rebuild tab bar
+        self.tab_bar.clear_all_tabs()
+        
+        if worktree_sessions:
+            # Show tab bar when there are sessions
+            self.tab_bar.show()
+            
+            # Add tabs for all sessions
+            for tab_id, session in worktree_sessions.items():
+                self.tab_bar.add_tab(tab_id, session.tab_name, make_active=(tab_id == self.current_tab_id))
+            
+            # Show the active session or the first one
+            if self.current_tab_id and self.current_tab_id in worktree_sessions:
+                self._show_session(worktree_path, self.current_tab_id)
+            else:
+                # Activate the first tab
+                first_tab_id = next(iter(worktree_sessions))
+                self.tab_bar.set_active_tab(first_tab_id)
+                self._show_session(worktree_path, first_tab_id)
         else:
-            # No session for this worktree
+            # Hide tab bar when no sessions
+            self.tab_bar.hide()
             self._show_no_session()
+            self.current_tab_id = None
 
     def run_claude_here(self, agent_cmd=None):
         """Start a new agent session for the current worktree."""
@@ -231,126 +266,8 @@ class TerminalPane(QWidget):
             self.open_external()
             return
 
-        # Check if we already have a session for this worktree
-        existing_session = self.session_manager.get_session(cwd)
-        if existing_session:
-            # Session already exists, just switch to it
-            self.switch_to_worktree(cwd)
-            return
-
-        # Create a new container widget for this session
-        container = QWidget(self.main_container)
-        container.setStyleSheet("background-color: black;")
-
-        # Hide all containers and show the new one
-        self._hide_all_containers()
-        self.main_container_layout.addWidget(container)
-        container.show()
-        self.current_container = container
-
-        # Ensure the container is properly sized and visible
-        container.updateGeometry()
-        
-        # Get the native window ID for embedding
-        wid = container.winId()
-
-        # Calculate appropriate geometry
-        container_width = container.width() if container.width() > 0 else 800
-        container_height = container.height() if container.height() > 0 else 600
-        char_width = 7
-        char_height = 14
-        cols = max(40, (container_width - 20) // char_width)
-        rows = max(10, (container_height - 20) // char_height)
-        geometry = f"{cols}x{rows}"
-
-        claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
-
-        # Command that starts in the worktree directory with common developer environments available
-        # We explicitly preserve PATH and source appropriate profile files for user tools
-        # Properly escape the PATH to handle spaces and special characters
-        # Current PATH is not used directly; we rely on sourced profiles' PATH and append common paths.
-        # Common developer tool paths that may not be present depending on how the app was launched
-        # (Finder-launched apps often inherit a minimal PATH on macOS)
-        additional_paths = ":".join([
-            "$HOME/.local/bin",
-            "$HOME/.poetry/bin",
-            "$HOME/.pyenv/bin",
-            "$HOME/.pyenv/shims",
-            "$HOME/.asdf/bin",
-            "$HOME/.asdf/shims",
-            "$HOME/.rtx/bin",
-            "$HOME/.deno/bin",
-            "$HOME/.cargo/bin",
-            "/opt/homebrew/bin",
-            "/opt/homebrew/sbin",
-            "/usr/local/bin",
-            "/usr/local/sbin",
-        ])
-
-        app_dir = Path(__file__).parent.parent
-        venv_bin_dir = app_dir / ".venv" / ("Scripts" if sys.platform.startswith("win") else "bin")
-        app_venv_bin_str = os.fspath(venv_bin_dir)
-
-        path_cleanup_snippet = ""
-        if not sys.platform.startswith("win") and app_venv_bin_str:
-            escaped_app_venv_bin = (
-                app_venv_bin_str
-                .replace("\\", "\\\\")
-                .replace('"', '\\"')
-                .replace("$", "\\$")
-            )
-            path_cleanup_snippet = (
-                f'APP_VENV_BIN="{escaped_app_venv_bin}"; '
-                'PATH="$(printf \'%s\' "$PATH" | awk -v RS=: -v ORS=: -v target="$APP_VENV_BIN" \'$0 != target\')"; '
-                'PATH="${PATH%:}"; '
-                'unset APP_VENV_BIN; '
-            )
-
-        path_append_snippet = (
-            f'PATH_EXTRAS="{additional_paths}"; '
-            'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
-            'unset PATH_EXTRAS; '
-        )
-        
-        # Choose appropriate shell and profile based on platform
-        if sys.platform == "darwin":
-            shell_cmd = "zsh"
-            # Source all relevant zsh and profile files if present, then ensure Homebrew env if available.
-            profile_source = (
-                "for f in /etc/zshenv /etc/zprofile /etc/profile ~/.zshenv ~/.zprofile ~/.profile ~/.zshrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done; "
-                "eval \"$('/opt/homebrew/bin/brew' shellenv)\" 2>/dev/null || "
-                "eval \"$('/usr/local/bin/brew' shellenv)\" 2>/dev/null || true"
-            )
-        else:
-            shell_cmd = "bash"
-            # Source common bash profile files on Linux; cover login and non-login shells.
-            profile_source = (
-                "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
-                "do [ -f \"$f\" ] && . \"$f\"; done"
-            )
-        
-        bash_command = (
-            f'{path_cleanup_snippet}'
-            f'{profile_source}; '  # Source user/system profiles for environment setup
-            f'{path_cleanup_snippet}'
-            f'{path_append_snippet}'  # Extend PATH with common tool locations, preserving profile changes
-            f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
-            f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
-            f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
-            f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
-            f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
-            f'cd {shlex.quote(str(cwd))}; '
-            f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
-        )
-
-        # Platform-specific terminal implementation
-        if sys.platform == "darwin":
-            # Mac: Use PTY-based terminal emulator
-            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
-        else:
-            # Linux: Use xterm embedding
-            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
+        # Create a new tab session
+        self._create_new_session(cwd, agent_cmd)
 
     def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
         """Start a PTY-based terminal for Mac."""
@@ -361,6 +278,7 @@ class TerminalPane(QWidget):
                 
                 # Create web terminal widget
                 terminal_widget = WebTerminalWidget(container, bash_command, str(cwd))
+                
                 # Hook inactivity signal to bubble up to the main app/sidebar
                 try:
                     terminal_widget.inactivity_for_worktree.connect(self._on_session_inactivity)
@@ -373,34 +291,54 @@ class TerminalPane(QWidget):
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.addWidget(terminal_widget)
                 
-                # Create a mock process object for compatibility with session manager
-                class MockProcess:
-                    def __init__(self, widget):
-                        self.widget = widget
-                        
-                    def poll(self):
-                        # Check if process is still running via bridge
-                        if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
-                            try:
-                                os.kill(self.widget.bridge.process_pid, 0)
-                                return None  # Still running
-                            except OSError:
+                # Check if terminal started successfully after a short delay
+                def check_terminal_and_register():
+                    if terminal_widget.is_terminal_started():
+                        # Create a mock process object for compatibility with session manager
+                        class MockProcess:
+                            def __init__(self, widget):
+                                self.widget = widget
+                                
+                            def poll(self):
+                                # Check if process is still running via bridge
+                                if hasattr(self.widget, 'bridge') and hasattr(self.widget.bridge, 'process_pid'):
+                                    # Check if process_pid is None (failed to start)
+                                    if self.widget.bridge.process_pid is None:
+                                        return 1  # Process ended
+                                    try:
+                                        os.kill(self.widget.bridge.process_pid, 0)
+                                        return None  # Still running
+                                    except OSError:
+                                        return 0  # Process ended
                                 return 0  # Process ended
-                        return 0
+                                
+                            def terminate(self):
+                                if hasattr(self.widget, 'cleanup'):
+                                    self.widget.cleanup()
                         
-                    def terminate(self):
-                        if hasattr(self.widget, 'cleanup'):
-                            self.widget.cleanup()
+                        # Register this session with mock process
+                        tab_id = self.session_manager.register_session(
+                            worktree_path=cwd,
+                            process=MockProcess(terminal_widget),
+                            container_frame=container,
+                            command=claude_cmd
+                        )
+                        
+                        # Update UI to show the new tab
+                        self.switch_to_worktree(cwd)
+                        self.tab_bar.set_active_tab(tab_id)
+                        
+                        self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
+                    else:
+                        # Terminal failed to start, show error and clean up
+                        QMessageBox.warning(self, "Terminal Error", "Failed to start embedded terminal. Opening external terminal instead.")
+                        container.setParent(None)
+                        container.deleteLater()
+                        self._show_no_session()
+                        self.open_external()
                 
-                # Register this session with mock process
-                self.session_manager.register_session(
-                    worktree_path=cwd,
-                    process=MockProcess(terminal_widget),
-                    container_frame=container,
-                    command=claude_cmd
-                )
-                
-                self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
+                # Check after terminal has had time to start
+                QTimer.singleShot(1000, check_terminal_and_register)
                 return
                 
             except ImportError:
@@ -435,12 +373,16 @@ class TerminalPane(QWidget):
                             self.widget._cleanup()
                 
                 # Register this session with mock process
-                self.session_manager.register_session(
+                tab_id = self.session_manager.register_session(
                     worktree_path=cwd,
                     process=MockProcess(terminal_widget),
                     container_frame=container,
                     command=claude_cmd
                 )
+                
+                # Update UI to show the new tab
+                self.switch_to_worktree(cwd)
+                self.tab_bar.set_active_tab(tab_id)
                 
                 self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
             
@@ -505,12 +447,16 @@ class TerminalPane(QWidget):
             proc = subprocess.Popen(cmdline, cwd=str(cwd), env=env)
 
             # Register this session
-            self.session_manager.register_session(
+            tab_id = self.session_manager.register_session(
                 worktree_path=cwd,
                 process=proc,
                 container_frame=container,
                 command=claude_cmd
             )
+            
+            # Update UI to show the new tab
+            self.switch_to_worktree(cwd)
+            self.tab_bar.set_active_tab(tab_id)
 
             self.status_lbl.setText(f"Started new session: {cwd.name}")
 
@@ -571,13 +517,186 @@ class TerminalPane(QWidget):
             launch_terminal_only(cwd)
 
     def stop_current(self):
-        """Stop the current worktree's session."""
-        if self.current_worktree_path and self.session_manager:
-            self.session_manager.remove_session(self.current_worktree_path)
-            self._show_no_session()
+        """Stop the current tab's session."""
+        if self.current_worktree_path and self.current_tab_id and self.session_manager:
+            self.session_manager.remove_session(self.current_worktree_path, self.current_tab_id)
+            # Refresh the worktree view
+            self.switch_to_worktree(self.current_worktree_path)
 
     def cleanup_all_sessions(self):
         """Clean up all sessions when closing the app."""
         if self.session_manager:
             for path_str in list(self.session_manager.sessions.keys()):
-                self.session_manager.remove_session(Path(path_str))
+                self.session_manager.remove_all_sessions_for_worktree(Path(path_str))
+    
+    def _create_new_session(self, cwd: Path, agent_cmd=None):
+        """Create a new terminal session in a new tab."""
+        # Create a new container widget for this session
+        container = QWidget(self.main_container)
+        container.setStyleSheet("background-color: black;")
+
+        # Hide all containers and show the new one
+        self._hide_all_containers()
+        self.main_container_layout.addWidget(container)
+        container.show()
+        self.current_container = container
+
+        # Ensure the container is properly sized and visible
+        container.updateGeometry()
+        
+        # Get the native window ID for embedding
+        wid = container.winId()
+
+        # Calculate appropriate geometry
+        container_width = container.width() if container.width() > 0 else 800
+        container_height = container.height() if container.height() > 0 else 600
+        char_width = 7
+        char_height = 14
+        cols = max(40, (container_width - 20) // char_width)
+        rows = max(10, (container_height - 20) // char_height)
+        geometry = f"{cols}x{rows}"
+
+        claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
+        
+        # Platform-specific command generation
+        if sys.platform.startswith("win"):
+            # Windows: Use cmd.exe
+            # Escape Windows paths and create a proper command
+            cwd_str = str(cwd)
+            if ' ' in cwd_str:
+                cwd_str = f'"{cwd_str}"'
+            
+            # Windows command to run Claude and stay in the directory
+            # Use full path to cmd.exe for reliability
+            cmd_exe = os.environ.get('COMSPEC', 'cmd.exe')
+            # Simplify command to avoid parsing issues
+            bash_command = f'{cmd_exe}'
+        else:
+            # Unix/Linux/macOS: Use the existing bash command generation
+            # Command that starts in the worktree directory with common developer environments available
+            # We explicitly preserve PATH and source appropriate profile files for user tools
+            # Properly escape the PATH to handle spaces and special characters
+            # Current PATH is not used directly; we rely on sourced profiles' PATH and append common paths.
+            # Common developer tool paths that may not be present depending on how the app was launched
+            # (Finder-launched apps often inherit a minimal PATH on macOS)
+            additional_paths = ":".join([
+                "$HOME/.local/bin",
+                "$HOME/.poetry/bin",
+                "$HOME/.pyenv/bin",
+                "$HOME/.pyenv/shims",
+                "$HOME/.asdf/bin",
+                "$HOME/.asdf/shims",
+                "$HOME/.rtx/bin",
+                "$HOME/.deno/bin",
+                "$HOME/.cargo/bin",
+                "/opt/homebrew/bin",
+                "/opt/homebrew/sbin",
+                "/usr/local/bin",
+                "/usr/local/sbin",
+            ])
+
+            app_dir = Path(__file__).parent.parent
+            venv_bin_dir = app_dir / ".venv" / ("Scripts" if sys.platform.startswith("win") else "bin")
+            app_venv_bin_str = os.fspath(venv_bin_dir)
+
+            path_cleanup_snippet = ""
+            if not sys.platform.startswith("win") and app_venv_bin_str:
+                escaped_app_venv_bin = (
+                    app_venv_bin_str
+                    .replace("\\", "\\\\")
+                    .replace('"', '\\\"')
+                    .replace("$", "\\$")
+                )
+                path_cleanup_snippet = (
+                    f'APP_VENV_BIN="{escaped_app_venv_bin}"; '
+                    'PATH="$(printf \'%s\' "$PATH" | awk -v RS=: -v ORS=: -v target="$APP_VENV_BIN" \'$0 != target\')"; '
+                    'PATH="${PATH%:}"; '
+                    'unset APP_VENV_BIN; '
+                )
+
+            path_append_snippet = (
+                f'PATH_EXTRAS="{additional_paths}"; '
+                'if [ -n "$PATH" ]; then PATH="$PATH:$PATH_EXTRAS"; else PATH="$PATH_EXTRAS"; fi; '
+                'unset PATH_EXTRAS; '
+            )
+            
+            # Choose appropriate shell and profile based on platform
+            if sys.platform == "darwin":
+                shell_cmd = "zsh"
+                # Source all relevant zsh and profile files if present, then ensure Homebrew env if available.
+                profile_source = (
+                    "for f in /etc/zshenv /etc/zprofile /etc/profile ~/.zshenv ~/.zprofile ~/.profile ~/.zshrc; "
+                    "do [ -f \"$f\" ] && . \"$f\"; done; "
+                    "eval \"$(\'/opt/homebrew/bin/brew\' shellenv)\" 2>/dev/null || "
+                    "eval \"$(\'/usr/local/bin/brew\' shellenv)\" 2>/dev/null || true"
+                )
+            else:
+                shell_cmd = "bash"
+                # Source common bash profile files on Linux; cover login and non-login shells.
+                profile_source = (
+                    "for f in /etc/profile ~/.bash_profile ~/.bash_login ~/.profile ~/.bashrc; "
+                    "do [ -f \"$f\" ] && . \"$f\"; done"
+                )
+            
+            bash_command = (
+                f'{path_cleanup_snippet}'
+                f'{profile_source}; '  # Source user/system profiles for environment setup
+                f'{path_cleanup_snippet}'
+                f'{path_append_snippet}'  # Extend PATH with common tool locations, preserving profile changes
+                f'export LANG=en_US.UTF-8; '  # Ensure UTF-8 locale
+                f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
+                f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
+                f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
+                f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
+                f'cd {shlex.quote(str(cwd))}; '
+                f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
+            )
+
+        # Platform-specific terminal implementation
+        if sys.platform == "darwin":
+            # Mac: Use PTY-based terminal emulator
+            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
+        elif sys.platform.startswith("win"):
+            # Windows: Use web terminal with winpty
+            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
+        else:
+            # Linux: Use xterm embedding
+            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
+    
+    def _show_session(self, worktree_path: Path, tab_id: str):
+        """Show a specific session's container."""
+        session = self.session_manager.get_session(worktree_path, tab_id)
+        
+        if session and session.container_frame:
+            # Hide all containers first
+            self._hide_all_containers()
+
+            # Show this session's container
+            self.main_container_layout.addWidget(session.container_frame)
+            session.container_frame.show()
+            self.current_container = session.container_frame
+            self.current_tab_id = tab_id
+            self.status_lbl.setText(f"Active: {session.tab_name}")
+    
+    def _on_tab_switched(self, tab_id: str):
+        """Handle tab switching."""
+        if self.current_worktree_path and tab_id:
+            self._show_session(self.current_worktree_path, tab_id)
+    
+    def _on_tab_close_requested(self, tab_id: str):
+        """Handle tab close request."""
+        if self.current_worktree_path and tab_id and self.session_manager:
+            self.session_manager.remove_session(self.current_worktree_path, tab_id)
+            # Refresh the worktree view
+            self.switch_to_worktree(self.current_worktree_path)
+    
+    def _on_new_tab_requested(self):
+        """Handle new tab request."""
+        self.run_claude_here()
+    
+    def _on_tab_rename_requested(self, tab_id: str, new_name: str):
+        """Handle tab rename request."""
+        if self.current_worktree_path and tab_id and self.session_manager:
+            self.session_manager.rename_tab(self.current_worktree_path, tab_id, new_name)
+            # Update the tab bar display
+            self.tab_bar.update_tab_name(tab_id, new_name)

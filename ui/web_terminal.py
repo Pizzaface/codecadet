@@ -1,7 +1,7 @@
 """Web-based terminal widget using xterm.js for better character handling."""
 
 import os
-import pty
+import sys
 import select
 import json
 import threading
@@ -16,6 +16,15 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtMultimedia import QSoundEffect
 
+# Platform-specific PTY imports
+if sys.platform.startswith("win"):
+    try:
+        from winpty import PtyProcess
+    except ImportError:
+        PtyProcess = None
+else:
+    import pty
+
 INACTIVITY_TIMER = 3
 
 
@@ -29,6 +38,7 @@ class TerminalBridge(QObject):
     def __init__(self):
         super().__init__()
         self.master_fd = None
+        self.process = None  # Store winpty process on Windows
         self.process_pid = None
         self.reader_thread = None
         self.running = False
@@ -43,8 +53,44 @@ class TerminalBridge(QObject):
         self.inactivity_triggered = False
         
     def start_pty(self, command, cwd):
-        """Start PTY process."""
-        try:
+        """Start PT process."""
+        import sys
+        if sys.platform.startswith("win"):
+            # Windows implementation using pywinpty
+            if not PtyProcess:
+                print("PtyProcess is None")
+                return False
+            
+            print(f"Starting terminal with command: {command}")
+            print(f"Working directory: {cwd}")
+            
+            # Create winpty process using PtyProcess.spawn
+            try:
+                self.process = PtyProcess.spawn(command, cwd=str(cwd))
+            except Exception as e:
+                print(f"PtyProcess.spawn failed with exception: {e}")
+                return False
+            
+            if self.process is None:
+                print("PtyProcess.spawn returned None")
+                return False
+            
+            # Check if the process has a valid PID
+            if not hasattr(self.process, 'pid') or self.process.pid is None:
+                print("Process has no valid PID")
+                return False
+            
+            self.process_pid = self.process.pid
+            self.running = True
+            
+            # Start reader thread
+            self.reader_thread = threading.Thread(target=self._read_pty)
+            self.reader_thread.daemon = True
+            self.reader_thread.start()
+            
+            return True
+        else:
+            # Unix implementation using pty
             pid, fd = pty.fork()
             
             if pid == 0:  # Child process
@@ -82,18 +128,19 @@ class TerminalBridge(QObject):
                 self.reader_thread.start()
                 
                 return True
-                
-        except Exception as e:
-            pass  # Failed to start PTY
-            return False
-    
+
     def _read_pty(self):
         """Read from PTY in background thread."""
-        while self.running and self.master_fd:
+        while self.running and (self.master_fd or self.process):
             try:
-                r, _, _ = select.select([self.master_fd], [], [], 0.1)
-                if r:
-                    data = os.read(self.master_fd, 4096)
+                if sys.platform.startswith("win") and self.process:
+                    # Windows: read from winpty process
+                    # Check if process is still alive before attempting to read
+                    if not self.process.isalive():
+                        break
+                    
+                    # Use a smaller read size to avoid blocking
+                    data = self.process.read(1024)
                     if data:
                         # Update last output time and reset inactivity flag
                         self.last_output_time = time.time()
@@ -105,11 +152,34 @@ class TerminalBridge(QObject):
                         # Indicate activity (output)
                         self.activity.emit()
                         # Emit base64 to preserve bytes and escape sequences
-                        b64 = base64.b64encode(data).decode('ascii')
+                        b64 = base64.b64encode(data.encode('utf-8', errors='replace')).decode('ascii')
                         self.data_received.emit(b64)
                     else:
-                        break
-            except OSError:
+                        time.sleep(0.01)  # Small delay to prevent busy loop
+                else:
+                    # Unix: use select to read from PTY
+                    r, _, _ = select.select([self.master_fd], [], [], 0.1)
+                    if r:
+                        data = os.read(self.master_fd, 4096)
+                        if data:
+                            # Update last output time and reset inactivity flag
+                            self.last_output_time = time.time()
+                            self._activity_seen = True
+                            if self.tracking_enabled:
+                                # First output after submit: start timing window
+                                self._awaiting_output = False
+                                self.inactivity_triggered = False
+                            # Indicate activity (output)
+                            self.activity.emit()
+                            # Emit base64 to preserve bytes and escape sequences
+                            b64 = base64.b64encode(data).decode('ascii')
+                            self.data_received.emit(b64)
+                        else:
+                            break
+            except (OSError, EOFError):
+                break
+            except Exception:
+                # Handle any other exceptions that might occur
                 break
     
     def _check_inactivity(self):
@@ -151,9 +221,14 @@ class TerminalBridge(QObject):
         # Indicate activity (input)
         self.activity.emit()
 
-        if self.master_fd and data:
+        if (self.master_fd or self.process) and data:
             try:
-                os.write(self.master_fd, data.encode('utf-8'))
+                if sys.platform.startswith("win") and self.process:
+                    # Windows: write to winpty process
+                    self.process.write(data)
+                else:
+                    # Unix: write to PTY
+                    os.write(self.master_fd, data.encode('utf-8'))
             except OSError:
                 pass
 
@@ -171,16 +246,17 @@ class TerminalBridge(QObject):
     @Slot(int, int)
     def resize_pty(self, cols, rows):
         """Resize the PTY."""
-        if self.master_fd:
-            try:
-                import fcntl
-                import struct
-                import termios
-                # Set the terminal size
-                s = struct.pack('HHHH', rows, cols, 0, 0)
-                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
-            except OSError:
-                pass
+        if sys.platform.startswith("win") and self.process:
+            # Windows: resize winpty process
+            self.process.setwinsize(cols, rows)
+        elif self.master_fd:
+            # Unix: resize PTY
+            import fcntl
+            import struct
+            import termios
+            # Set the terminal size
+            s = struct.pack('HHHH', rows, cols, 0, 0)
+            fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
     
     def cleanup(self):
         """Clean up PTY resources."""
@@ -190,18 +266,28 @@ class TerminalBridge(QObject):
         if self.reader_thread:
             self.reader_thread.join(timeout=1.0)
         
-        if self.master_fd:
+        if sys.platform.startswith("win") and self.process:
+            # Windows: clean up winpty process
             try:
-                os.close(self.master_fd)
-            except OSError:
+                self.process.terminate()
+            except Exception:
                 pass
+            self.process = None
             self.master_fd = None
-        
-        if self.process_pid:
-            try:
-                os.kill(self.process_pid, 15)  # SIGTERM
-            except OSError:
-                pass
+        else:
+            # Unix: clean up PTY
+            if self.master_fd:
+                try:
+                    os.close(self.master_fd)
+                except OSError:
+                    pass
+                self.master_fd = None
+            
+            if self.process_pid:
+                try:
+                    os.kill(self.process_pid, 15)  # SIGTERM
+                except OSError:
+                    pass
 
 
 class WebTerminalWidget(QWidget):
@@ -214,6 +300,9 @@ class WebTerminalWidget(QWidget):
         
         # Remember which worktree this widget is for
         self.cwd_path = str(cwd)
+        
+        # Track if terminal started successfully
+        self._terminal_started = False
 
         self.bridge = TerminalBridge()
         self.bridge.data_received.connect(self._on_data_received)
@@ -264,9 +353,15 @@ class WebTerminalWidget(QWidget):
         """Connect the bridge and start PTY."""
         # Start PTY
         if self.bridge.start_pty(command, cwd):
+            self._terminal_started = True
             self.web_view.page().runJavaScript("console.log('PTY started successfully')")
         else:
+            self._terminal_started = False
             self.web_view.page().runJavaScript("window.writeToTerminal('Failed to start terminal session\\r\\n')")
+    
+    def is_terminal_started(self):
+        """Check if the terminal started successfully."""
+        return self._terminal_started
     
     def _on_data_received(self, data):
         """Handle data received from PTY (base64-encoded bytes)."""

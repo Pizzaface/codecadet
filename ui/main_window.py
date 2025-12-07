@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSettings, QUrl
-from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon
+from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QCheckBox, QSplitter,
@@ -316,6 +316,18 @@ class App(QMainWindow):
         # These are in addition to menu shortcuts
         create_shortcut = QKeySequence("Ctrl+N")
         refresh_shortcut = QKeySequence("Ctrl+R")
+        new_tab_shortcut = QKeySequence("Ctrl+T")
+        close_tab_shortcut = QKeySequence("Ctrl+W")
+        
+        # Create shortcuts for tab management
+        
+        # New terminal tab
+        self.new_tab_shortcut = QShortcut(new_tab_shortcut, self)
+        self.new_tab_shortcut.activated.connect(self._new_terminal_tab)
+        
+        # Close terminal tab
+        self.close_tab_shortcut = QShortcut(close_tab_shortcut, self)
+        self.close_tab_shortcut.activated.connect(self._close_terminal_tab)
         
         # Note: Menu actions already have their shortcuts, these are additional
         self.create_worktree  # Will be triggered by menu action
@@ -876,6 +888,17 @@ class App(QMainWindow):
     def _set_status(self, text: str):
         """Set status bar text."""
         self.status_label.setText(text)
+    
+    def _new_terminal_tab(self):
+        """Handle Ctrl+T - Create new terminal tab."""
+        if hasattr(self, 'term') and self.term:
+            self.term.run_claude_here()
+    
+    def _close_terminal_tab(self):
+        """Handle Ctrl+W - Close current terminal tab."""
+        if hasattr(self, 'term') and self.term:
+            # Forward to terminal pane's stop_current method
+            self.term.stop_current()
 
     def closeEvent(self, event):
         """Handle close event."""

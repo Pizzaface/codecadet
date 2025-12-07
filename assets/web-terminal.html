@@ -131,12 +131,16 @@
             const dims = fitAddon.proposeDimensions();
 
             if (dims && qtBridge) {
+                // Ensure dims has valid cols and rows
+                const cols = dims.cols || 80;
+                const rows = dims.rows || 24;
+                
                 // Only resize PTY if dimensions actually changed
-                if (dims.cols !== lastCols || dims.rows !== lastRows) {
-                    console.log('[DEBUG] PTY resize:', lastCols + 'x' + lastRows + ' -> ' + dims.cols + 'x' + dims.rows);
-                    lastCols = dims.cols;
-                    lastRows = dims.rows;
-                    qtBridge.resize_pty(dims.cols, dims.rows);
+                if (cols !== lastCols || rows !== lastRows) {
+                    console.log('[DEBUG] PTY resize:', (lastCols || 'null') + 'x' + (lastRows || 'null') + ' -> ' + cols + 'x' + rows);
+                    lastCols = cols;
+                    lastRows = rows;
+                    qtBridge.resize_pty(cols, rows);
                 } else {
                     console.log('[DEBUG] No PTY resize needed, dimensions unchanged');
                 }
