@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 # Add the project root to Python path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models import SessionInfo
 from session import SessionManager
@@ -26,8 +26,12 @@ def test_session_manager_multitab():
     # Test 1: Register multiple sessions
     print("\n1. Registering multiple sessions...")
     
-    # Create mock process and container for testing
-    mock_process = subprocess.Popen(["sleep", "10"])
+    # Create mock process and container for testing (cross-platform)
+    mock_process = subprocess.Popen([
+        sys.executable,
+        "-c",
+        "import time; time.sleep(10)",
+    ])
     mock_container = None  # We don't need a real container for testing
     
     tab1_id = manager.register_session(
