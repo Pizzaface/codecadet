@@ -16,7 +16,7 @@ class _CloseTabBar(QTabBar):
         self.setMovable(True)
         self.setExpanding(False)
         self.setUsesScrollButtons(True)
-        self.setFont(QFont("Segoe UI", 10))
+        self.setFont(QFont("Arial", 10))
         self.setContextMenuPolicy(Qt.CustomContextMenu)
 
     def tabInserted(self, index: int) -> None:
@@ -88,7 +88,7 @@ class TabBar(QWidget):
         # New tab button
         self.new_tab_btn = QPushButton(" + ")
         self.new_tab_btn.setFixedSize(30, 24)
-        self.new_tab_btn.setToolTip("New Terminal Tab")
+        self.new_tab_btn.setToolTip("New Tab (runs selected agent)")
         self.new_tab_btn.clicked.connect(self.tab_new_requested.emit)
         
         layout.addWidget(self.new_tab_btn)
@@ -97,75 +97,73 @@ class TabBar(QWidget):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             TabBar {
-                background-color: #090b10;
-                border-bottom: 1px solid #242836;
+                background-color: #0d1117;
+                border-bottom: 1px solid #30363d;
+                padding: 0px;
             }
             QTabBar {
                 background-color: transparent;
+                qproperty-drawBase: 0;
             }
             QTabBar::tab {
-                background-color: #131722;
-                color: #a0a4b3;
-                border: 1px solid transparent;
-                border-bottom: 1px solid #242836;
-                padding: 6px 14px;
-                margin-right: 2px;
-                min-width: 90px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
+                background-color: #161b22;
+                color: #8b949e;
+                border: none;
+                border-bottom: 2px solid transparent;
+                padding: 8px 16px;
+                padding-right: 28px;
+                margin-right: 1px;
+                min-width: 100px;
+                font-size: 12px;
+                font-weight: 500;
             }
             QTabBar::tab:selected {
-                background-color: #0f1118;
-                color: #f2f3f7;
-                border-color: #3e4a63;
-                border-bottom: 2px solid #4e8cff;
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-bottom: 2px solid #58a6ff;
             }
-            QTabBar::tab:hover {
-                background-color: #191f2e;
-                color: #f2f3f7;
-            }
-            QTabBar::tab:!selected {
-                margin-top: 2px;
+            QTabBar::tab:hover:!selected {
+                background-color: #21262d;
+                color: #c9d1d9;
             }
             QTabBar::tab:first {
-                margin-left: 4px;
-            }
-            QTabBar::tab:last {
-                margin-right: 0;
+                margin-left: 8px;
             }
             #terminalTabCloseButton {
-                background-color: #ff3b30;
-                color: #ffffff;
-                border: 1px solid #ff7676;
-                border-radius: 8px;
+                background-color: transparent;
+                color: #6e7681;
+                border: none;
+                border-radius: 4px;
                 padding: 0;
-                margin: 0;
-                min-width: 16px;
-                min-height: 16px;
-                max-width: 16px;
-                max-height: 16px;
-                font-size: 10px;
-                font-weight: bold;
+                margin: 2px;
+                min-width: 18px;
+                min-height: 18px;
+                max-width: 18px;
+                max-height: 18px;
+                font-size: 11px;
+                font-weight: normal;
             }
             #terminalTabCloseButton:hover {
-                background-color: #ff5544;
-                border-color: #ff9990;
+                background-color: #f85149;
+                color: #ffffff;
             }
             QPushButton {
-                background-color: #131722;
-                color: #f2f3f7;
-                border: 1px solid #3e4a63;
+                background-color: #21262d;
+                color: #c9d1d9;
+                border: 1px solid #30363d;
                 border-radius: 6px;
-                font-size: 14px;
-                font-weight: bold;
-                padding: 2px 8px;
-                margin-right: 6px;
+                font-size: 16px;
+                font-weight: 600;
+                padding: 4px 10px;
+                margin: 4px 8px 4px 4px;
             }
             QPushButton:hover {
-                background-color: #191f2e;
+                background-color: #30363d;
+                border-color: #8b949e;
+                color: #e6edf3;
             }
             QPushButton:pressed {
-                background-color: #202736;
+                background-color: #161b22;
             }
         """)
     

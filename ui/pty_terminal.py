@@ -267,8 +267,8 @@ class PTYTerminalWidget(QTextEdit):
             if pid == 0:  # Child process
                 # Set environment for proper terminal and character support
                 os.environ['TERM'] = 'xterm-256color'  # Enable color support
-                os.environ['COLUMNS'] = '80'
-                os.environ['LINES'] = '24'
+                os.environ['COLUMNS'] = '120'  # Match web terminal defaults
+                os.environ['LINES'] = '30'
                 os.environ['LANG'] = 'en_US.UTF-8'  # Ensure UTF-8
                 os.environ['LC_ALL'] = 'en_US.UTF-8'  # Force UTF-8 for all categories
                 os.environ['LC_CTYPE'] = 'en_US.UTF-8'  # Character classification
@@ -288,10 +288,18 @@ class PTYTerminalWidget(QTextEdit):
             else:  # Parent process
                 self.master_fd = fd
                 self.process_pid = pid
-                
+
+                # Set initial PTY size via ioctl BEFORE any reads
+                # This is critical - many CLIs query TIOCGWINSZ immediately on startup
+                import struct
+                import termios
+                initial_rows, initial_cols = 30, 120  # Match env var defaults
+                s = struct.pack('HHHH', initial_rows, initial_cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
+
                 # Make non-blocking
                 fcntl.fcntl(self.master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-                
+
                 # Start reader thread
                 self.reader = PTYReader(self.master_fd)
                 self.reader.data_received.connect(self._on_data_received)

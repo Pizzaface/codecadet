@@ -694,6 +694,11 @@ class SimpleWorktreeSidebar(QWidget):
         """Get selected worktree."""
         return self.selected_panel.info.path if self.selected_panel else None
 
+    def select_first_worktree(self):
+        """Select the first worktree in the list."""
+        if self.panels:
+            self._on_panel_selected(self.panels[0].info)
+
 
 class BranchSelectionDialog(QDialog):
     """Dialog for selecting branches with search functionality."""

@@ -101,6 +101,8 @@
         new QWebChannel(qt.webChannelTransport, function (channel) {
             qtBridge = channel.objects.qtBridge;
             console.log('Qt WebChannel connected');
+            // Immediately fit terminal to container and sync PTY size
+            setTimeout(function() { handleResize(true); }, 100);
         });
 
         // Handle input from terminal
@@ -118,6 +120,11 @@
         var lastRows = null;
         var isResizing = false;
 
+        // Padding to subtract from terminal dimensions to account for UI chrome
+        // (tab bar, adjuster/splitter, container margins)
+        var COLS_PADDING = 2;  // Subtract 2 columns for horizontal padding
+        var ROWS_PADDING = 1;  // Subtract 1 row for vertical padding
+
         function handleResize(force) {
             if (typeof force === 'undefined') force = false;
             if (isResizing && !force) {
@@ -131,13 +138,15 @@
             const dims = fitAddon.proposeDimensions();
 
             if (dims && qtBridge) {
-                // Ensure dims has valid cols and rows
-                const cols = dims.cols || 80;
-                const rows = dims.rows || 24;
-                
+                // Ensure dims has valid cols and rows, then subtract padding for UI chrome
+                const rawCols = dims.cols || 80;
+                const rawRows = dims.rows || 24;
+                const cols = Math.max(40, rawCols - COLS_PADDING);
+                const rows = Math.max(10, rawRows - ROWS_PADDING);
+
                 // Only resize PTY if dimensions actually changed
                 if (cols !== lastCols || rows !== lastRows) {
-                    console.log('[DEBUG] PTY resize:', (lastCols || 'null') + 'x' + (lastRows || 'null') + ' -> ' + cols + 'x' + rows);
+                    console.log('[DEBUG] PTY resize:', (lastCols || 'null') + 'x' + (lastRows || 'null') + ' -> ' + cols + 'x' + rows + ' (raw: ' + rawCols + 'x' + rawRows + ')');
                     lastCols = cols;
                     lastRows = rows;
                     qtBridge.resize_pty(cols, rows);

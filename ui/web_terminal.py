@@ -82,12 +82,20 @@ class TerminalBridge(QObject):
             
             self.process_pid = self.process.pid
             self.running = True
-            
+
+            # Set initial PTY size immediately
+            # This is critical - many CLIs query terminal size on startup
+            initial_rows, initial_cols = 30, 120
+            try:
+                self.process.setwinsize(initial_rows, initial_cols)
+            except Exception:
+                pass  # setwinsize may not be available on all winpty versions
+
             # Start reader thread
             self.reader_thread = threading.Thread(target=self._read_pty)
             self.reader_thread.daemon = True
             self.reader_thread.start()
-            
+
             return True
         else:
             # Unix implementation using pty
@@ -121,12 +129,22 @@ class TerminalBridge(QObject):
                 self.master_fd = fd
                 self.process_pid = pid
                 self.running = True
-                
+
+                # Set initial PTY size via ioctl BEFORE any reads
+                # This is critical - many CLIs query TIOCGWINSZ immediately on startup
+                # and won't use COLUMNS/LINES env vars. Without this, they get 0x0.
+                import fcntl
+                import struct
+                import termios
+                initial_rows, initial_cols = 30, 120  # Match env var defaults
+                s = struct.pack('HHHH', initial_rows, initial_cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, s)
+
                 # Start reader thread
                 self.reader_thread = threading.Thread(target=self._read_pty)
                 self.reader_thread.daemon = True
                 self.reader_thread.start()
-                
+
                 return True
 
     def _read_pty(self):
@@ -355,9 +373,16 @@ class WebTerminalWidget(QWidget):
         if self.bridge.start_pty(command, cwd):
             self._terminal_started = True
             self.web_view.page().runJavaScript("console.log('PTY started successfully')")
+            # Trigger a resize to sync PTY with actual container dimensions
+            QTimer.singleShot(200, self._trigger_initial_resize)
         else:
             self._terminal_started = False
             self.web_view.page().runJavaScript("window.writeToTerminal('Failed to start terminal session\\r\\n')")
+
+    def _trigger_initial_resize(self):
+        """Trigger initial resize to sync PTY with container dimensions."""
+        # Force a resize to match the actual widget dimensions
+        self.web_view.page().runJavaScript("if (typeof handleResize === 'function') { handleResize(true); }")
     
     def is_terminal_started(self):
         """Check if the terminal started successfully."""

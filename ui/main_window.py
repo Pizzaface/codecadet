@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings, QUrl
+from PySide6.QtCore import Qt, QSettings, QUrl, QEvent
 from PySide6.QtGui import QFont, QAction, QKeySequence, QIcon, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtMultimedia import QSoundEffect
 
-from config import load_config, save_config, push_recent_repo, get_agent_command, get_default_agent, get_coding_agents
+from config import load_config, save_config, push_recent_repo, get_agent_command, get_default_agent, get_coding_agents, get_agent_config
 from git_utils import git_version_ok, ensure_repo_root, list_worktrees, list_branches
 from git_utils import add_worktree, remove_worktree, prune_worktrees
 from session import SessionManager
@@ -148,7 +148,8 @@ class App(QMainWindow):
             splitter,
             get_selected_cwd=lambda: self.sidebar.get_selected_worktree(),
             claude_cmd_getter=lambda: get_agent_command(self.cfg),
-            config_getter=lambda: self.cfg
+            config_getter=lambda: self.cfg,
+            selected_agent_getter=self._get_selected_agent_info
         )
         splitter.addWidget(self.term)
         
@@ -158,8 +159,8 @@ class App(QMainWindow):
         # Update terminal button text with default agent
         self.term.update_run_button_text()
         
-        # Set splitter proportions
-        splitter.setSizes([400, 600])
+        # Set splitter proportions (smaller left pane)
+        splitter.setSizes([280, 720])
         main_layout.addWidget(splitter, 1)  # stretch factor 1
         
         # Bottom action bar
@@ -692,6 +693,10 @@ class App(QMainWindow):
 
         self.sidebar.update_worktrees(self.infos)
 
+        # Auto-select the first worktree if none is selected
+        if self.infos and not self.sidebar.get_selected_worktree():
+            self.sidebar.select_first_worktree()
+
     def _get_branches(self) -> list[str]:
         """Get list of all branches for branch switching."""
         if not self.repo_root:
@@ -881,9 +886,29 @@ class App(QMainWindow):
             agent_id = self.agent_combo.itemData(index)
             agent_name = self.agent_combo.itemText(index)
             self._set_status(f"🤖 Selected agent: {agent_name}")
-            # Update terminal button if this becomes the default
-            if agent_id == get_default_agent(self.cfg):
-                self.term.update_run_button_text()
+            # Always update terminal button text when agent selection changes
+            self.term.update_run_button_text()
+
+    def _get_selected_agent_info(self):
+        """Get the currently selected agent info: (agent_id, agent_name, agent_command)."""
+        if not hasattr(self, 'agent_combo'):
+            return None
+
+        agent_id = self.agent_combo.currentData()
+        agent_name = self.agent_combo.currentText()
+
+        # If combo is empty or no selection, fall back to config
+        if not agent_id or not agent_name:
+            agent_id = get_default_agent(self.cfg)
+            agent_config = get_agent_config(self.cfg, agent_id)
+            if agent_config:
+                agent_name = agent_config.get("name", agent_id)
+            else:
+                agent_name = agent_id
+
+        agent_command = get_agent_command(self.cfg, agent_id)
+
+        return (agent_id, agent_name, agent_command)
 
     def _set_status(self, text: str):
         """Set status bar text."""
@@ -899,6 +924,28 @@ class App(QMainWindow):
         if hasattr(self, 'term') and self.term:
             # Forward to terminal pane's stop_current method
             self.term.stop_current()
+
+    def changeEvent(self, event):
+        """Handle window state changes - auto-focus terminal on activation."""
+        if event.type() == QEvent.Type.WindowActivate:
+            # Focus the terminal when the window is activated
+            self._focus_terminal()
+        super().changeEvent(event)
+
+    def _focus_terminal(self):
+        """Focus the active terminal widget."""
+        try:
+            if hasattr(self, 'term') and self.term and self.term.current_container:
+                # Find the web terminal widget in the current container
+                from .web_terminal import WebTerminalWidget
+                for child in self.term.current_container.findChildren(WebTerminalWidget):
+                    if child.web_view:
+                        child.web_view.setFocus()
+                        # terminal is a global var in the HTML script context
+                        child.web_view.page().runJavaScript("if (typeof terminal !== 'undefined') terminal.focus();")
+                        break
+        except Exception:
+            pass
 
     def closeEvent(self, event):
         """Handle close event."""

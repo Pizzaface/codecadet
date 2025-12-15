@@ -14,26 +14,53 @@ class SessionManager:
     def __init__(self, max_tabs_per_worktree: int = 10):
         self.sessions: Dict[str, Dict[str, SessionInfo]] = {}  # {worktree_path_str: {tab_id: SessionInfo}}
         self.max_tabs_per_worktree = max_tabs_per_worktree
-        self._tab_counter = 0  # For generating unique tab names
 
-    def register_session(self, worktree_path: Path, process, 
-                         container_frame, command: str, tab_name: Optional[str] = None) -> str:
+    def _generate_tab_name(self, worktree_path: Path, base_name: str) -> str:
+        """Generate a unique tab name based on agent name, incrementing if duplicates exist."""
+        path_str = str(worktree_path)
+        worktree_sessions = self.sessions.get(path_str, {})
+
+        # Count existing tabs with the same base name
+        existing_names = [s.tab_name for s in worktree_sessions.values()]
+
+        # Check if base name (without number) already exists
+        count = 0
+        for name in existing_names:
+            if name == base_name:
+                count += 1
+            elif name.startswith(base_name + " (") and name.endswith(")"):
+                # Extract number from "Agent Name (N)"
+                try:
+                    num = int(name[len(base_name) + 2:-1])
+                    count = max(count, num)
+                except ValueError:
+                    pass
+
+        if count == 0 and base_name not in existing_names:
+            return base_name
+        else:
+            return f"{base_name} ({count + 1})"
+
+    def register_session(self, worktree_path: Path, process,
+                         container_frame, command: str, tab_name: Optional[str] = None,
+                         agent_name: Optional[str] = None) -> str:
         """Register a new terminal session for a worktree and return the tab_id."""
         path_str = str(worktree_path)
-        
+
         # Initialize worktree sessions dict if needed
         if path_str not in self.sessions:
             self.sessions[path_str] = {}
-        
+
         # Check tab limit
         if len(self.sessions[path_str]) >= self.max_tabs_per_worktree:
             raise ValueError(f"Maximum {self.max_tabs_per_worktree} tabs per worktree reached")
-        
+
         # Generate unique tab ID and name
         tab_id = str(uuid.uuid4())[:8]  # Short UUID4
         if not tab_name:
-            self._tab_counter += 1
-            tab_name = f"Terminal {self._tab_counter}"
+            # Use agent name as base, default to "Terminal" if not provided
+            base_name = agent_name if agent_name else "Terminal"
+            tab_name = self._generate_tab_name(worktree_path, base_name)
         
         self.sessions[path_str][tab_id] = SessionInfo(
             worktree_path=worktree_path,

@@ -33,11 +33,12 @@ class TerminalPane(QWidget):
         cleaned = [part for part in parts if part != entry]
         return sep.join(cleaned)
 
-    def __init__(self, parent, get_selected_cwd, claude_cmd_getter, config_getter=None):
+    def __init__(self, parent, get_selected_cwd, claude_cmd_getter, config_getter=None, selected_agent_getter=None):
         super().__init__(parent)
         self.get_selected_cwd = get_selected_cwd
         self.get_claude_cmd = claude_cmd_getter
         self.get_config = config_getter
+        self.get_selected_agent = selected_agent_getter  # Returns (agent_id, agent_name, agent_command)
         self.current_worktree_path: Path | None = None
         self.current_tab_id: str | None = None
         self.current_container: QWidget | None = None
@@ -90,9 +91,10 @@ class TerminalPane(QWidget):
         no_session_label = QLabel("No Session")
         no_session_label.setStyleSheet("""
             QLabel {
-                color: #8b8e98;
-                font-size: 24px;
-                font-weight: bold;
+                color: #484f58;
+                font-size: 20px;
+                font-weight: 600;
+                letter-spacing: 1px;
             }
         """)
         no_session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -105,7 +107,11 @@ class TerminalPane(QWidget):
         self.run_claude_btn.clicked.connect(self.run_claude_here)
         control_layout.addWidget(self.run_claude_btn)
         self.update_run_button_text()
-        
+
+        open_terminal_btn = QPushButton("▶ Open Terminal")
+        open_terminal_btn.clicked.connect(self.open_terminal_here)
+        control_layout.addWidget(open_terminal_btn)
+
         external_btn = QPushButton("□ Open External Terminal")
         external_btn.clicked.connect(self.open_external)
         control_layout.addWidget(external_btn)
@@ -125,29 +131,35 @@ class TerminalPane(QWidget):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QWidget {
-                background-color: #0f1115;
-                color: #e6e7ee;
+                background-color: #0d1117;
+                color: #e6edf3;
             }
             QLabel {
-                color: #e6e7ee;
-                font-size: 11px;
+                color: #8b949e;
+                font-size: 12px;
+                font-weight: 500;
             }
             QPushButton {
-                background-color: #1a1f2e;
-                color: #e6e7ee;
-                border: 1px solid #404757;
-                border-radius: 4px;
-                padding: 8px 12px;
-                font-size: 11px;
+                background-color: #21262d;
+                color: #c9d1d9;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                padding: 8px 14px;
+                font-size: 12px;
+                font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #20273a;
+                background-color: #30363d;
+                border-color: #8b949e;
+                color: #e6edf3;
             }
             QPushButton:pressed {
-                background-color: #26304a;
+                background-color: #161b22;
             }
             QFrame {
-                background-color: #0f1115;
+                background-color: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
             }
         """)
 
@@ -156,7 +168,16 @@ class TerminalPane(QWidget):
         self.session_manager = session_manager
     
     def update_run_button_text(self):
-        """Update the run button text with the default agent name."""
+        """Update the run button text with the currently selected agent name."""
+        # Try to get the currently selected agent first
+        if self.get_selected_agent:
+            agent_info = self.get_selected_agent()
+            if agent_info:
+                _, agent_name, _ = agent_info
+                self.run_claude_btn.setText(f"▶ Run {agent_name} here")
+                return
+
+        # Fall back to default agent from config
         if self.get_config:
             from config import get_default_agent, get_agent_config
             config = self.get_config()
@@ -254,6 +275,37 @@ class TerminalPane(QWidget):
             self._show_no_session()
             self.current_tab_id = None
 
+    def _get_agent_name(self) -> str:
+        """Get the currently selected agent's display name."""
+        # Try to get the currently selected agent first
+        if self.get_selected_agent:
+            agent_info = self.get_selected_agent()
+            if agent_info:
+                _, agent_name, _ = agent_info
+                return agent_name
+
+        # Fall back to default agent from config
+        if self.get_config:
+            from config import get_default_agent, get_agent_config
+            config = self.get_config()
+            default_agent = get_default_agent(config)
+            agent_config = get_agent_config(config, default_agent)
+            if agent_config:
+                return agent_config.get("name", default_agent)
+        return "Terminal"
+
+    def _get_agent_command(self) -> str:
+        """Get the currently selected agent's command."""
+        # Try to get the currently selected agent first
+        if self.get_selected_agent:
+            agent_info = self.get_selected_agent()
+            if agent_info:
+                _, _, agent_command = agent_info
+                return agent_command
+
+        # Fall back to the default command getter
+        return self.get_claude_cmd()
+
     def run_claude_here(self, agent_cmd=None):
         """Start a new agent session for the current worktree."""
         cwd = self.get_selected_cwd()
@@ -266,10 +318,28 @@ class TerminalPane(QWidget):
             self.open_external()
             return
 
-        # Create a new tab session
-        self._create_new_session(cwd, agent_cmd)
+        # Get agent name for the tab
+        agent_name = self._get_agent_name()
 
-    def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd):
+        # Create a new tab session
+        self._create_new_session(cwd, agent_cmd, agent_name)
+
+    def open_terminal_here(self):
+        """Start a new plain terminal session (no agent) for the current worktree."""
+        cwd = self.get_selected_cwd()
+        if not cwd:
+            return
+
+        self.current_worktree_path = cwd
+
+        if not self.can_embed:
+            launch_terminal_only(cwd)
+            return
+
+        # Create a terminal-only session (empty command means just shell)
+        self._create_new_session(cwd, agent_cmd="", agent_name="Terminal")
+
+    def _start_pty_terminal(self, container, cwd, bash_command, claude_cmd, agent_name: str = None):
         """Start a PTY-based terminal for Mac."""
         try:
             # Try web terminal first (better character handling)
@@ -321,14 +391,21 @@ class TerminalPane(QWidget):
                             worktree_path=cwd,
                             process=MockProcess(terminal_widget),
                             container_frame=container,
-                            command=claude_cmd
+                            command=claude_cmd,
+                            agent_name=agent_name
                         )
-                        
+
                         # Update UI to show the new tab
                         self.switch_to_worktree(cwd)
                         self.tab_bar.set_active_tab(tab_id)
-                        
+
                         self.status_lbl.setText(f"Started web terminal session: {cwd.name}")
+
+                        # Trigger resize after tab is fully visible to ensure proper terminal sizing
+                        def delayed_resize():
+                            if terminal_widget.web_view:
+                                terminal_widget.web_view.page().runJavaScript("if (typeof handleResize === 'function') handleResize(true);")
+                        QTimer.singleShot(400, delayed_resize)
                     else:
                         # Terminal failed to start, show error and clean up
                         QMessageBox.warning(self, "Terminal Error", "Failed to start embedded terminal. Opening external terminal instead.")
@@ -377,13 +454,14 @@ class TerminalPane(QWidget):
                     worktree_path=cwd,
                     process=MockProcess(terminal_widget),
                     container_frame=container,
-                    command=claude_cmd
+                    command=claude_cmd,
+                    agent_name=agent_name
                 )
-                
+
                 # Update UI to show the new tab
                 self.switch_to_worktree(cwd)
                 self.tab_bar.set_active_tab(tab_id)
-                
+
                 self.status_lbl.setText(f"Started PTY terminal session: {cwd.name}")
             
         except ImportError as e:
@@ -399,7 +477,7 @@ class TerminalPane(QWidget):
             container.deleteLater()
             self._show_no_session()
 
-    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin=None):
+    def _start_xterm_terminal(self, container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin=None, agent_name: str = None):
         """Start xterm-based terminal for Linux."""
         cmdline = [
             "xterm",
@@ -451,9 +529,10 @@ class TerminalPane(QWidget):
                 worktree_path=cwd,
                 process=proc,
                 container_frame=container,
-                command=claude_cmd
+                command=claude_cmd,
+                agent_name=agent_name
             )
-            
+
             # Update UI to show the new tab
             self.switch_to_worktree(cwd)
             self.tab_bar.set_active_tab(tab_id)
@@ -529,7 +608,7 @@ class TerminalPane(QWidget):
             for path_str in list(self.session_manager.sessions.keys()):
                 self.session_manager.remove_all_sessions_for_worktree(Path(path_str))
     
-    def _create_new_session(self, cwd: Path, agent_cmd=None):
+    def _create_new_session(self, cwd: Path, agent_cmd=None, agent_name: str = None):
         """Create a new terminal session in a new tab."""
         # Create a new container widget for this session
         container = QWidget(self.main_container)
@@ -547,16 +626,17 @@ class TerminalPane(QWidget):
         # Get the native window ID for embedding
         wid = container.winId()
 
-        # Calculate appropriate geometry
+        # Calculate appropriate geometry with padding for UI chrome (adjuster, margins)
         container_width = container.width() if container.width() > 0 else 800
         container_height = container.height() if container.height() > 0 else 600
         char_width = 7
         char_height = 14
-        cols = max(40, (container_width - 20) // char_width)
-        rows = max(10, (container_height - 20) // char_height)
+        # Subtract padding: 32px horizontal (margins + adjuster), 24px vertical (tab bar overhead)
+        cols = max(40, (container_width - 32) // char_width)
+        rows = max(10, (container_height - 24) // char_height)
         geometry = f"{cols}x{rows}"
 
-        claude_cmd = agent_cmd if agent_cmd else self.get_claude_cmd()
+        claude_cmd = agent_cmd if agent_cmd is not None else self._get_agent_command()
         
         # Platform-specific command generation
         if sys.platform.startswith("win"):
@@ -638,6 +718,12 @@ class TerminalPane(QWidget):
                     "do [ -f \"$f\" ] && . \"$f\"; done"
                 )
             
+            # Build the command to run (if any)
+            if claude_cmd:
+                run_cmd_snippet = f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
+            else:
+                run_cmd_snippet = ''
+
             bash_command = (
                 f'{path_cleanup_snippet}'
                 f'{profile_source}; '  # Source user/system profiles for environment setup
@@ -647,7 +733,7 @@ class TerminalPane(QWidget):
                 f'export LC_ALL=en_US.UTF-8; '  # Force UTF-8 for all categories
                 f'export LC_CTYPE=en_US.UTF-8; '  # Character classification
                 f'export PYTHONIOENCODING=utf-8; '  # Python UTF-8 handling
-                f'cd {shlex.quote(str(cwd))} && {claude_cmd}; '
+                f'{run_cmd_snippet}'
                 f'cd {shlex.quote(str(cwd))}; '
                 f'exec {shell_cmd} -i'  # Interactive shell to maintain environment
             )
@@ -655,18 +741,18 @@ class TerminalPane(QWidget):
         # Platform-specific terminal implementation
         if sys.platform == "darwin":
             # Mac: Use PTY-based terminal emulator
-            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
+            self._start_pty_terminal(container, cwd, bash_command, claude_cmd, agent_name)
         elif sys.platform.startswith("win"):
             # Windows: Use web terminal with winpty
-            self._start_pty_terminal(container, cwd, bash_command, claude_cmd)
+            self._start_pty_terminal(container, cwd, bash_command, claude_cmd, agent_name)
         else:
             # Linux: Use xterm embedding
-            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str)
+            self._start_xterm_terminal(container, cwd, bash_command, claude_cmd, geometry, wid, app_venv_bin_str, agent_name)
     
     def _show_session(self, worktree_path: Path, tab_id: str):
         """Show a specific session's container."""
         session = self.session_manager.get_session(worktree_path, tab_id)
-        
+
         if session and session.container_frame:
             # Hide all containers first
             self._hide_all_containers()
@@ -677,6 +763,15 @@ class TerminalPane(QWidget):
             self.current_container = session.container_frame
             self.current_tab_id = tab_id
             self.status_lbl.setText(f"Active: {session.tab_name}")
+
+            # Trigger resize after tab is visible to ensure proper terminal sizing
+            def delayed_resize():
+                from .web_terminal import WebTerminalWidget
+                for child in session.container_frame.findChildren(WebTerminalWidget):
+                    if child.web_view:
+                        child.web_view.page().runJavaScript("if (typeof handleResize === 'function') handleResize(true);")
+                        break
+            QTimer.singleShot(400, delayed_resize)
     
     def _on_tab_switched(self, tab_id: str):
         """Handle tab switching."""
