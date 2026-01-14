@@ -8,6 +8,7 @@ import fcntl
 import struct
 import termios
 import re
+import locale
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Signal, QThread
@@ -226,7 +227,17 @@ class PTYTerminalWidget(QTextEdit):
         
         # Set monospace font with Unicode box-drawing support
         # Try fonts in order of preference for proper Unicode support
-        font_families = ["SF Mono", "Monaco", "Menlo", "Consolas", "DejaVu Sans Mono"]
+        font_families = [
+            "DejaVu Sans Mono",  # Common on Linux
+            "Liberation Mono",    # Common on Linux (Red Hat)
+            "Ubuntu Mono",        # Ubuntu default
+            "Fira Code",          # Popular programming font
+            "SF Mono",            # macOS
+            "Monaco",             # macOS
+            "Menlo",              # macOS
+            "Consolas",           # Windows
+            "monospace"           # Generic fallback
+        ]
         font = None
         
         for family in font_families:
@@ -269,9 +280,14 @@ class PTYTerminalWidget(QTextEdit):
                 os.environ['TERM'] = 'xterm-256color'  # Enable color support
                 os.environ['COLUMNS'] = '80'
                 os.environ['LINES'] = '24'
-                os.environ['LANG'] = 'en_US.UTF-8'  # Ensure UTF-8
-                os.environ['LC_ALL'] = 'en_US.UTF-8'  # Force UTF-8 for all categories
-                os.environ['LC_CTYPE'] = 'en_US.UTF-8'  # Character classification
+                # Check if locale exists, otherwise use C.UTF-8 as fallback
+                try:
+                    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+                    os.environ['LANG'] = 'en_US.UTF-8'
+                except locale.Error:
+                    os.environ['LANG'] = 'C.UTF-8'  # More universally available
+                os.environ['LC_ALL'] = os.environ['LANG']
+                os.environ['LC_CTYPE'] = os.environ['LANG']
                 os.environ['COLORTERM'] = 'truecolor'  # Enable true color support
                 # Force colored output from common tools
                 os.environ['CLICOLOR'] = '1'
@@ -283,7 +299,14 @@ class PTYTerminalWidget(QTextEdit):
                 os.chdir(cwd)
                 
                 # Execute shell command
-                os.execv('/bin/zsh', ['/bin/zsh', '-c', command])
+                # Detect available shell - prefer zsh, fall back to bash
+                if os.path.exists('/bin/zsh'):
+                    shell = '/bin/zsh'
+                elif os.path.exists('/bin/bash'):
+                    shell = '/bin/bash'
+                else:
+                    shell = '/bin/sh'
+                os.execv(shell, [shell, '-c', command])
             
             else:  # Parent process
                 self.master_fd = fd
