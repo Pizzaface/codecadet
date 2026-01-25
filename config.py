@@ -18,6 +18,7 @@ DEFAULT_CONFIG = {
     "embed_terminal": True,  # try to embed xterm on Linux
     "claude_command": "claude",  # override if you use a different CLI (deprecated, use coding_agents)
     "recent_branches": {},  # dict[str, list[str]] - repo_path -> [branch_names]
+    "terminal_bell_enabled": True,  # bool - enable/disable terminal bell functionality
     "coding_agents": {  # dict[str, dict] - agent configurations
         "claude": {
             "command": "claude",
@@ -181,3 +182,4 @@ def migrate_legacy_config(cfg: dict):
             }
         }
         cfg["default_agent"] = "claude"
+

@@ -25,6 +25,7 @@ class TerminalBridge(QObject):
     data_received = Signal(str)
     inactivity_detected = Signal()  # Signal when no output for 10 seconds
     activity = Signal()  # Fires on any input or output
+    bell_triggered = Signal()  # Signal when terminal bell is triggered
     
     def __init__(self):
         super().__init__()
@@ -182,6 +183,11 @@ class TerminalBridge(QObject):
             except OSError:
                 pass
     
+    @Slot()
+    def handle_bell_event(self):
+        """Handle terminal bell event from JavaScript."""
+        self.bell_triggered.emit()
+    
     def cleanup(self):
         """Clean up PTY resources."""
         self.running = False
@@ -219,6 +225,7 @@ class WebTerminalWidget(QWidget):
         self.bridge.data_received.connect(self._on_data_received)
         self.bridge.inactivity_detected.connect(self._on_inactivity_detected)
         self.bridge.activity.connect(self._on_activity)
+        self.bridge.bell_triggered.connect(self._on_bell_triggered)
         
         # Setup sound effect for inactivity notification
         self.sound_effect = QSoundEffect()
@@ -297,6 +304,16 @@ class WebTerminalWidget(QWidget):
         # Do not auto-arm tracking here; rely on Enter-based arming
         self.activity_for_worktree.emit(self.cwd_path)
     
+    def _on_bell_triggered(self):
+        """Handle terminal bell event - play sound effect."""
+        # Check if bell is enabled in configuration
+        from config import load_config
+        config = load_config()
+        if config.get("terminal_bell_enabled", True):
+            # Play the existing sound effect (done.wav)
+            if self.sound_effect and self.sound_effect.source():
+                self.sound_effect.play()
+    
     def closeEvent(self, event):
         """Clean up when closing."""
         self.bridge.cleanup()
@@ -305,3 +322,7 @@ class WebTerminalWidget(QWidget):
     def cleanup(self):
         """Clean up resources."""
         self.bridge.cleanup()
+
+
+
+
